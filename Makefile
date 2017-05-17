@@ -33,7 +33,7 @@ endif
 
 ifeq ($(UNAME_S), MINGW64_NT-6.3)
    ECHO_MESSAGE = "Windows"
-   LIBS = -lglut32 -lgdi32 -lopengl32 -limm32
+   LIBS = -lglut32 -lglew32 -lgdi32 -lopengl32 -limm32
 
    #CXXFLAGS = -I../../ -I../libs/glut `pkg-config --cflags glut`
    #CXXFLAGS += -Wall -Wformat
