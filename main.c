@@ -1,26 +1,33 @@
 //#define USE_GLEW
+//#define NO_FIXED_FUNCTION_PIPELINE
+
+#ifdef __EMSCRIPTEN__
+#	undef USE_GLEW
+#	undef NO_FIXED_FUNCTION_PIPELINE
+#	define NO_FIXED_FUNCTION_PIPELINE
+#endif //__EMSCRIPTEN__
 
 #ifdef _WIN32
-#include "windows.h"
-#define USE_GLEW
-#include "GLEW/glew.h"
-//#include "glext.h"
-#include "GLUT/glut.h"
-#ifdef __FREEGLUT_STD_H__   
-#include <GLUT/freeglut_ext.h>   
-#endif //__FREEGLUT_STD_H__
-#else 
-#ifdef USE_GLEW
-#include "GL/glew.h"
-#else
-#define GL_GLEXT_PROTOTYPES
-//#include "GL/glext.h"
-#endif
-#include "GL/glut.h"
-#ifdef __FREEGLUT_STD_H__   
-#include <GL/freeglut_ext.h>   
-#endif //__FREEGLUT_STD_H__
-#endif
+#	include "windows.h"
+#	define USE_GLEW
+#	include "GL/glew.h"
+#	include "GL/glut.h"
+#	ifdef __FREEGLUT_STD_H__   
+#		include "GL/freeglut_ext.h"
+#	endif //__FREEGLUT_STD_H__
+#else // _WIN32 
+#	ifdef USE_GLEW
+#		include "GL/glew.h"
+#	else //USE_GLEW
+#		define GL_GLEXT_PROTOTYPES
+#	endif //USE_GLEW
+#	include "GL/glut.h"
+#	ifdef __FREEGLUT_STD_H__   
+#		ifndef __EMSCRIPTEN__
+#			include "GL/freeglut_ext.h"   
+#		endif //__EMSCRIPTEN__
+#	endif //__FREEGLUT_STD_H__
+#endif // _WIN32
 
 #include <stdio.h>
 #include <math.h>
@@ -50,10 +57,18 @@ float minCameraTargetDistance =  2.f;
 float maxCameraTargetDistance = 50.f;
 const unsigned FPS_TARGET = 35;
 unsigned FPS = 35;
-
+int showFPS = 
+#ifdef NO_FIXED_FUNCTION_PIPELINE
+0;
+#else
+1;
+#endif
 
 
 const char ScreenQuadVS[] = 
+"#ifdef GL_ES\n"\
+"precision highp float;\n"\
+"#endif\n"\
 "attribute vec3 a_position;\n"\
 "\n"\
 "void main()	{\n"\
@@ -63,8 +78,10 @@ const char ScreenQuadVS[] =
 const char ScreenQuadFS[] = 
 "#ifdef GL_ES\n"\
 "precision mediump float;\n"\
-"#endif\n"\
+"uniform lowp sampler2D s_diffuse;\n"\
+"#else\n"\
 "uniform sampler2D s_diffuse;\n"\
+"#endif\n"\
 "uniform vec3 screenResAndFactor; // .x and .y in pixels; .z in [0,1]: default: 1\n"\
 "\n"\
 "void main() {\n"\
@@ -109,8 +126,8 @@ void RenderTarget_Create(RenderTarget* rt) {
 	}
 	else {
 		rt->aLoc_APosition = glGetAttribLocation(rt->screenQuadProgramId, "a_position");
-		rt->uLoc_SDiffuse = glGetUniformLocationARB(rt->screenQuadProgramId,"s_diffuse");
-		rt->uLoc_screenResAndFactor = glGetUniformLocationARB(rt->screenQuadProgramId,"screenResAndFactor");
+		rt->uLoc_SDiffuse = glGetUniformLocation(rt->screenQuadProgramId,"s_diffuse");
+		rt->uLoc_screenResAndFactor = glGetUniformLocation(rt->screenQuadProgramId,"screenResAndFactor");
 		if (rt->aLoc_APosition<0) fprintf(stderr,"Error: rt->aLoc_APosition<0\n");	
 		if (rt->uLoc_SDiffuse<0) fprintf(stderr,"Error: uLoc_SDiffuse<0\n");	
 		if (rt->uLoc_screenResAndFactor<0) fprintf(stderr,"Error: uLoc_screenResAndFactor<0\n");	
@@ -134,6 +151,7 @@ void RenderTarget_Destroy(RenderTarget* rt) {
 	rt->screenQuadProgramId=0;
 }
 void RenderTarget_Init(RenderTarget* rt,int width, int height) {
+	int i;	
 	/*	
 	In terms of performance, each time you bind, the driver needs to validate the state which costs CPU time. 
 	It has been found that you get a speed boost if your textures is the same size and you use 1 FBO for them.
@@ -146,7 +164,7 @@ void RenderTarget_Init(RenderTarget* rt,int width, int height) {
 	rt->height = height;
 
 
-for (int i=0;i<NUM_RENDER_TARGETS;i++)	{
+	for (i=0;i<NUM_RENDER_TARGETS;i++)	{
 	rt->resolution_factor[i] = 1;
 	
 	glBindTexture(GL_TEXTURE_2D, rt->texture[i]);
@@ -154,8 +172,13 @@ for (int i=0;i<NUM_RENDER_TARGETS;i++)	{
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, rt->width, rt->height, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, 0);	// GL_BGRA, GL_UNSIGNED_BYTE
 
+#	ifdef __EMSCRIPTEN__	// WebGL 1.0 (in Firefox) seems to accept only this settings (we could use it for non-emscripten builds too)
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, rt->width, rt->height, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+#	else
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, rt->width, rt->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);	// GL_BGRA, GL_UNSIGNED_BYTE
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, rt->width, rt->height, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, 0);	// GL_BGRA, GL_UNSIGNED_BYTE
+#	endif
 
 	//glBindRenderbuffer(GL_RENDERBUFFER, rt->depth_buffer[i]);
 	//glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, rt->width, rt->height);	// GL_DEPTH_COMPONENT or GL_DEPTH_COMPONENT16
@@ -166,8 +189,8 @@ for (int i=0;i<NUM_RENDER_TARGETS;i++)	{
 
 	{
    	//Does the GPU support current FBO configuration?
-   	GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
-   	if (status!=GL_FRAMEBUFFER_COMPLETE_EXT) printf("glCheckFramebufferStatusEXT(...) FAILED.\n");
+   	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+   	if (status!=GL_FRAMEBUFFER_COMPLETE) printf("glCheckFramebufferStatus(...) FAILED.\n");
 	}
 
 	
@@ -198,9 +221,9 @@ void MyShaderStuff_Create(MyShaderStuff* p) {
 	if (!p->programId) return;			
 	
 	p->aLoc_APosition = glGetAttribLocation(p->programId, "a_position");
-	p->uLoc_iResolution = glGetUniformLocationARB(p->programId,"iResolution");
-	p->uLoc_iGlobalTime = glGetUniformLocationARB(p->programId,"iGlobalTime");
-	p->uLoc_iCameraMatrix = glGetUniformLocationARB(p->programId,"iCameraMatrix");
+	p->uLoc_iResolution = glGetUniformLocation(p->programId,"iResolution");
+	p->uLoc_iGlobalTime = glGetUniformLocation(p->programId,"iGlobalTime");
+	p->uLoc_iCameraMatrix = glGetUniformLocation(p->programId,"iCameraMatrix");
 	
 }
 void MyShaderStuff_Destroy(MyShaderStuff* p) {if (p->programId) glDeleteProgram(p->programId);p->programId=0;}
@@ -269,7 +292,7 @@ GLhandleARB loadShader(const char* buffer, const unsigned int type)
 	char* errorLogText;
 	GLsizei actualErrorLogLength;
 	
-	handle = glCreateShaderObjectARB(type);
+	handle = glCreateShader(type);
 	if (!handle)
 	{
 		//We have failed creating the vertex shader object.
@@ -278,16 +301,16 @@ GLhandleARB loadShader(const char* buffer, const unsigned int type)
 	}
 	
 	files[0] = (const GLcharARB*)buffer;
-	glShaderSourceARB(
+	glShaderSource(
 					  handle, //The handle to our shader
 					  1, //The number of files.
 					  files, //An array of const char * data, which represents the source code of theshaders
 					  NULL);
 	
-	glCompileShaderARB(handle);
-	
+	glCompileShader(handle);
+
 	//Compilation checking.
-	glGetObjectParameterivARB(handle, GL_OBJECT_COMPILE_STATUS_ARB, &result);
+	glGetShaderiv(handle, GL_COMPILE_STATUS, &result);
 	
 	// If an error was detected.
 	if (!result)
@@ -296,13 +319,13 @@ GLhandleARB loadShader(const char* buffer, const unsigned int type)
 		printf("Shader failed compilation.\n");
 		
 		//Attempt to get the length of our error log.
-		glGetObjectParameterivARB(handle, GL_OBJECT_INFO_LOG_LENGTH_ARB, &errorLoglength);
+		glGetShaderiv(handle, GL_INFO_LOG_LENGTH, &errorLoglength);
 		
 		//Create a buffer to read compilation error message
 		errorLogText =(char*) malloc(sizeof(char) * errorLoglength);
 		
 		//Used to get the final length of the log.
-		glGetInfoLogARB(handle, errorLoglength, &actualErrorLogLength, errorLogText);
+		glGetShaderInfoLog(handle, errorLoglength, &actualErrorLogLength, errorLogText);
 		
 		// Display errors.
 		printf("%s\n",errorLogText);
@@ -323,19 +346,20 @@ GLuint loadShaderProgramFromSource(const char* vs,const char* fs)	{
 
 	GLhandleARB vertexShaderHandle;
 	GLhandleARB fragmentShaderHandle;		
+	GLuint programId = 0;
 
 	vertexShaderHandle   = loadShader(vs,GL_VERTEX_SHADER);
 	fragmentShaderHandle = loadShader(fs,GL_FRAGMENT_SHADER);
 	if (!vertexShaderHandle || !fragmentShaderHandle) return 0;
 
-	GLuint programId = glCreateProgramObjectARB();
+	programId = glCreateProgram();
 	
-	glAttachObjectARB(programId,vertexShaderHandle);
-	glAttachObjectARB(programId,fragmentShaderHandle);
-	glLinkProgramARB(programId);
+	glAttachShader(programId,vertexShaderHandle);
+	glAttachShader(programId,fragmentShaderHandle);
+	glLinkProgram(programId);
 
 	//Link checking.
-	glGetObjectParameterivARB(programId, GL_OBJECT_LINK_STATUS_ARB, &result);
+	glGetProgramiv(programId, GL_LINK_STATUS, &result);
 	
 	// If an error was detected.
 	if (!result)
@@ -344,13 +368,13 @@ GLuint loadShaderProgramFromSource(const char* vs,const char* fs)	{
 		printf("Program failed to link.\n");
 		
 		//Attempt to get the length of our error log.
-		glGetObjectParameterivARB(programId, GL_OBJECT_INFO_LOG_LENGTH_ARB, &errorLoglength);
+		glGetProgramiv(programId, GL_INFO_LOG_LENGTH, &errorLoglength);
 		
 		//Create a buffer to read compilation error message
 		errorLogText =(char*) malloc(sizeof(char) * errorLoglength);
 		
 		//Used to get the final length of the log.
-		glGetInfoLogARB(programId, errorLoglength, &actualErrorLogLength, errorLogText);
+		glGetProgramInfoLog(programId, errorLoglength, &actualErrorLogLength, errorLogText);
 		
 		// Display errors.
 		printf("%s\n",errorLogText);
@@ -388,7 +412,8 @@ if (h>0)	{
 
 
 
-void InitGL() {
+void InitGL(void) {
+	vec3_t cameraPos;
 
 	glEnable(GL_TEXTURE_2D);
 	MyShaderStuff_Create(&progParams);
@@ -405,8 +430,8 @@ void InitGL() {
 	glDepthMask(GL_FALSE);
 
 	cameraTarget = vec3( -0.5f, -0.4f, 0.5f );
-	vec3_t cameraPos = vec3(-0.5f+3.5*cos(0.1f*15.f + 6.0f*0.f), 1.0f + 2.0f*0.f, 0.5f + 4.0f*sin(0.1f*15.f + 6.0f*0.f));
-	
+	cameraPos = vec3(-0.5f+3.5*cos(0.1f*15.f + 6.0f*0.f), 1.0f + 2.0f*0.f, 0.5f + 4.0f*sin(0.1f*15.f + 6.0f*0.f));
+
 	cameraMatrix = m4_identity();
 	m4_set_translation(&cameraMatrix,cameraPos);
 	m4_look_at_YX	(&cameraMatrix,cameraTarget,minCameraTargetDistance,maxCameraTargetDistance);	
@@ -419,8 +444,9 @@ void DestroyGL() {
 	MyShaderStuff_Destroy(&progParams);
 }
 
-void DrawText(int x, int y, char *string);
-void Draw3DTest();
+#ifndef NO_FIXED_FUNCTION_PIPELINE
+void DrawGlutText(int x, int y, char *string);
+#endif
 
 void DrawGL(void) 
 {	
@@ -435,9 +461,10 @@ void DrawGL(void)
 	static unsigned cameraMatrixSlerpTimerBegin = 0;
 	int render_target_index2 = 0;
 	float current_resolution_factor_fbo,current_resolution_factor_draw;
+	unsigned elapsed_time,delta_time;
 	if (begin==0) begin = glutGet(GLUT_ELAPSED_TIME);
-	unsigned elapsed_time = glutGet(GLUT_ELAPSED_TIME) - begin;
-	unsigned delta_time = elapsed_time - cur_time;
+	elapsed_time = glutGet(GLUT_ELAPSED_TIME) - begin;
+	delta_time = elapsed_time - cur_time;
 	cur_time = elapsed_time;
 	
 	// camera stuff
@@ -466,14 +493,14 @@ void DrawGL(void)
 	else glViewport(0, 0, render_target.width, render_target.height);	
 
 	//Using the raycast shader
-	glUseProgramObjectARB(progParams.programId);
+	glUseProgram(progParams.programId);
 	MyShaderStuff_SetUniforms(&progParams,
 			render_target.width *  (render_target.dynamic_resolution_enabled ? resolution_factor : 1.0f),
 			render_target.height * (render_target.dynamic_resolution_enabled ? resolution_factor : 1.0f),
 			(float)elapsed_time/1000.f,
 			&cameraMatrix);
 	ScreenQuadVBO_Draw();
-	//glUseProgramObjectARB(0);	
+	//glUseProgram(0);	
 
 	if (render_target.dynamic_resolution_enabled) 
 		glBindFramebuffer(GL_FRAMEBUFFER,render_target.default_frame_buffer);
@@ -490,22 +517,22 @@ void DrawGL(void)
 		glActiveTexture(GL_TEXTURE0);	
 		glBindTexture(GL_TEXTURE_2D, render_target.texture[render_target_index2]);
 
-		glUseProgramObjectARB(render_target.screenQuadProgramId);
+		glUseProgram(render_target.screenQuadProgramId);
 		glUniform1i(render_target.uLoc_SDiffuse,0);	
 		glUniform3f(render_target.uLoc_screenResAndFactor,render_target.width,render_target.height,render_target.resolution_factor[render_target_index2]);	
 		ScreenQuadVBO_Draw();
 
-		//glUseProgramObjectARB(0);
+		//glUseProgram(0);
 		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 	//--------------------------------------------------------------------------------------------------------------
 
-	glUseProgramObjectARB(0);
+	glUseProgram(0);
 	ScreenQuadVBO_Unbind();
 
-
-	DrawText(20,(int) (render_target.height-20), tmp);
-
+#	ifndef NO_FIXED_FUNCTION_PIPELINE
+	if (showFPS) DrawGlutText(20,(int) (render_target.height-20), tmp);
+#	endif
 
 	// Do FPS count and adjust resolution_factor
 	++frame;
@@ -525,23 +552,27 @@ void DrawGL(void)
 			resolution_factor+= resolution_factor*(FPS-FPS_TARGET)*0.0175f;
 			if (resolution_factor>1.0f) resolution_factor=1.0f;
 		}
-		sprintf(tmp,"FPS: %u DYN-RES:%s DRF=%1.3f (%dx%d %s)",FPS,render_target.dynamic_resolution_enabled ? "ON " : "OFF",resolution_factor,render_target.width,render_target.height,windowId ? "windowed" : "fullscreen");
-		//glutSetWindowTitle(tmp);	
-		
-		//printf("FPS: %u DYN-RES:%s DRF=%1.3f (%dx%d %s)\n",FPS,render_target.dynamic_resolution_enabled ? "ON " : "OFF",resolution_factor,render_target.width,render_target.height,windowId ? "windowed" : "fullscreen");		
+		sprintf(tmp,"FPS: %u DYN-RES:%s DRF=%1.3f (%dx%d %s)",FPS,render_target.dynamic_resolution_enabled ? "ON " : "OFF",resolution_factor,render_target.width,render_target.height,windowId ? "windowed" : "fullscreen");		
+#		ifdef NO_FIXED_FUNCTION_PIPELINE
+		if (showFPS)	{
+			//glutSetWindowTitle(tmp);			
+			printf("FPS: %u DYN-RES:%s DRF=%1.3f (%dx%d %s)\n",FPS,render_target.dynamic_resolution_enabled ? "ON " : "OFF",resolution_factor,render_target.width,render_target.height,windowId ? "windowed" : "fullscreen");		
+		}
+#		endif //NO_FIXED_FUNCTION_PIPELINE
 	}
 }
 
-void DrawText(int x, int y, char *string)
+#ifndef NO_FIXED_FUNCTION_PIPELINE
+void DrawGlutText(int x, int y, char *string)
 {
-	int len, i;
+	int len, i;mat4_t orthoMatrix;
 	
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
 
-	mat4_t orthoMatrix = m4_ortho_2d(0, render_target.width,0,render_target.height);
+	orthoMatrix = m4_ortho_2d(0, render_target.width,0,render_target.height);
 	glLoadMatrixf(&(orthoMatrix.m[0][0]));
-	
+
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	glLoadIdentity();
@@ -569,21 +600,23 @@ void DrawText(int x, int y, char *string)
 	glPopMatrix();
 	glMatrixMode(GL_MODELVIEW);
 }
+#endif//NO_FIXED_FUNCTION_PIPELINE
 
-static void GlutDestroyWindow();
+static void GlutDestroyWindow(void);
 static void GlutCreateWindow(int fullScreen);
 
 
 void GlutNormalKeys(unsigned char key, int x, int y) {
 	const int mod = glutGetModifiers();    	
 	switch (key) {
+#	ifndef __EMSCRIPTEN__	
 	case 27: 	// esc key
 		GlutDestroyWindow();
-#ifdef __FREEGLUT_STD_H__		
-		glutLeaveMainLoop();		
-#else
+#		ifdef __FREEGLUT_STD_H__	
+		glutLeaveMainLoop();	
+#		else
 		exit(0);
-#endif
+#		endif
 	break;
 	case 13:	// return key
 	{
@@ -594,8 +627,9 @@ void GlutNormalKeys(unsigned char key, int x, int y) {
 		}
 	}			
 	break;   
+#endif //__EMSCRIPTEN__	
 	}
-	
+
 }
 
 void MoveCameraAroundTarget(int glut_key,float amount,const mat4_t* cameraIn,mat4_t* cameraOut) {
@@ -635,9 +669,9 @@ void ZoomCamera(int glut_key,float amount,const mat4_t* cameraIn,mat4_t* cameraO
 }
 
 void MoveCameraTarget(int glut_key,float amount,const mat4_t* cameraIn,mat4_t* cameraOut) {
-	if (cameraOut!=cameraIn) *cameraOut=*cameraIn;
 	vec3_t cameraPos = m4_get_translation(cameraIn);
 	vec3_t deltaTarget = vec3(0,0,0);
+	if (cameraOut!=cameraIn) *cameraOut=*cameraIn;
 	if 		(glut_key==GLUT_KEY_LEFT) 		deltaTarget.x-=amount;
 	else if (glut_key==GLUT_KEY_RIGHT)		deltaTarget.x+=amount;
 	else if	(glut_key==GLUT_KEY_UP) 		deltaTarget.z+=amount;
@@ -692,7 +726,13 @@ void GlutSpecialKeys(int key,int x,int y)
 	case GLUT_KEY_F1:	
 	{
 		render_target.dynamic_resolution_enabled = !render_target.dynamic_resolution_enabled;
-		//printf("dynamic_resolution_enabled: %s.\n",render_target.dynamic_resolution_enabled?"ON":"OFF");
+		printf("dynamic_resolution_enabled: %s.\n",render_target.dynamic_resolution_enabled?"ON":"OFF");
+	}
+	break;
+	case GLUT_KEY_F2:	
+	{
+		showFPS = !showFPS;
+		printf("showFPS: %s.\n",showFPS?"ON":"OFF");
 	}
 	break;
 	}
@@ -720,10 +760,10 @@ void GlutMouse(int a,int b,int c,int d) {
 
 
 
-static void GlutDrawGL()		{DrawGL();glutSwapBuffers();}
-static void GlutIdle(void)		{glutPostRedisplay();}
-static void GlutFakeDrawGL() 	{glutDisplayFunc(GlutDrawGL);}
-void GlutDestroyWindow() {
+static void GlutDrawGL(void)		{DrawGL();glutSwapBuffers();}
+static void GlutIdle(void)			{glutPostRedisplay();}
+static void GlutFakeDrawGL(void) 	{glutDisplayFunc(GlutDrawGL);}
+void GlutDestroyWindow(void) {
 	if (gameModeWindowId || windowId)	{	
 	DestroyGL();
 		
@@ -773,7 +813,7 @@ void GlutCreateWindow(int fullScreen) {
     	GLenum err = glewInit();
     	if( GLEW_OK != err ) {
     	    fprintf(stderr, "Error initializing GLEW: %s\n", glewGetErrorString(err) );
-    	    return -1;
+    	    return;
     	}
 	}
 #elif _WIN32
@@ -810,14 +850,12 @@ int main(int argc, char** argv)
 
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);	// GLUT_ALPHA
-	glutInitContextFlags(GLUT_FORWARD_COMPATIBLE
-#ifdef _DEBUG
-        | GLUT_DEBUG
-#endif
-    );
+#ifndef __EMSCRIPTEN__
+	//glutInitContextFlags(GLUT_FORWARD_COMPATIBLE);
 #ifdef __FREEGLUT_STD_H__
     glutSetOption ( GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION ) ;
 #endif //__FREEGLUT_STD_H__
+#endif //__EMSCRIPTEN__
 
    	GlutCreateWindow(0);
 
@@ -830,8 +868,11 @@ int main(int argc, char** argv)
 
 	printf("\nKEYS:\n");
 	printf("AROW KEYS + PAGE_UP/PAGE_DOWN:\tmove camera (optionally with CTRL down)\n");
-	printf("F1:\t\t\t\ttoggle dynamic resolution on/off\n");	
+	printf("F1:\t\t\t\ttoggle dynamic resolution on/off\n");
+	printf("F2:\t\t\t\ttoggle display FPS on/off\n");
+#	ifndef __EMSCRIPTEN__	
 	printf("CTRL+RETURN:\t\t\ttoggle fullscreen on/off\n\n");	
+#	endif //__EMSCRIPTEN__	
 
 	glutMainLoop();
 
@@ -841,110 +882,3 @@ return 0;
 
 
 
-/*
-// 1) TODO: Add a mat3 uniform for the camera:
-
-mat3 setCamera( in vec3 ro, in vec3 ta, float cr )
-{
-	vec3 cw = normalize(ta-ro);
-	vec3 cp = vec3(sin(cr), cos(cr),0.0);
-	vec3 cu = normalize( cross(cw,cp) );
-	vec3 cv = normalize( cross(cu,cw) );
-    return mat3( cu, cv, cw );
-}
-
-    vec2 mo = iMouse.xy/iResolution.xy;
-	float time = 15.0 + iGlobalTime;
-
-	// camera	
-    vec3 ro = vec3( -0.5+3.5*cos(0.1*time + 6.0*mo.x), 1.0 + 2.0*mo.y, 0.5 + 4.0*sin(0.1*time + 6.0*mo.x) );
-    vec3 ta = vec3( -0.5, -0.4, 0.5 );
-    // camera-to-world transformation
-    mat3 ca = setCamera( ro, ta, 0.0 );			// This can be passed as a uniform!
-
-// 2) TODO: Add display list for the screen quad
-// 3) TODO: Add dynamic resolution rendering
-
-// 2 can be done from OpenGL>=3, or OpenGLES>=3 using "gl_VertexID":
-	https://rauwendaal.net/2014/06/14/rendering-a-screen-covering-triangle-in-opengl/    
-
-	// drawcall, no VAO bound (it works, but to be legal we need to generate an empty VAO, or VBO, and bind it)
-    glDrawArrays( GL_TRIANGLES, 0, 3 );
-
-
-    // vertex shader without any vertex attribute----------
-    out vec2 vTexCoord;
-
-    void main()
-    {
-    	vTexCoord   = vec2( (gl_VertexID << 1) & 2, gl_VertexID & 2 );
-    	gl_Position = vec4( vTexCoord * 2.0 - 1.0, 0.0, 1.0 );
-    }
-	//------------------------------------------------------
-
-	// alternative vertex shader----------------------------
-	void main()
-	{
-    	float x = -1.0 + float((gl_VertexID & 1) << 2);
-    	float y = -1.0 + float((gl_VertexID & 2) << 1);
-    	gl_Position = vec4(x, y, 0, 1);
-	}
-	//------------------------------------------------------
-
-	This transforms the gl_VertexID as follows:
-
-	gl_VertexID=0 -> (-1,-1)		2|
-	gl_VertexID=1 -> ( 3,-1)		 |_
-	gl_VertexID=2 -> (-1, 3)		0|_|___1
-
-	// same with texcoords-----------------------------------
-	out vec2 texCoord;
- 
-	void main()
-	{
-    float x = -1.0 + float((gl_VertexID & 1) << 2);
-    float y = -1.0 + float((gl_VertexID & 2) << 1);
-    texCoord.x = (x+1.0)*0.5;
-    texCoord.y = (y+1.0)*0.5;
-    gl_Position = vec4(x, y, 0, 1);
-	}
-	//-------------------------------------------------------
-
-*/
-
-/*
-NOTE: If we want to make this WebGL/GLES compatible, 
-we must draw the screen quad using a vertex buffer and a different vertex shader:
-
-positions = [ [-1,1], [1,1], [-1,-1], [1,-1] ]
-uv = [ [0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0] ]
-
-And that quad is rendered as TRIANGLE_STRIP. Also, instead of setting UVs explicitly, some prefer 
-to use fragment shader's built-in variable gl_FragCoord, which is then divided with, for example, 
-a uniform vec2 uScreenResolution.
-
-Vertex shader:
-
-attribute vec2 aPos;
-attribute vec2 aUV;
-varying vec2 vUV;
-
-void main() {
-    gl_Position = vec4(aPos, 0.0, 1.0);
-    vUV = aUV;
-}
-
-And fragment shader would then look something like this:
-
-uniform vec2 uScreenResolution;
-varying vec2 vUV;
-
-void main() {
-    // vUV is equal to gl_FragCoord/uScreenResolution
-    // do some pixel shader related work
-    gl_FragColor = vec3(someColor);
-}
-
-ShaderToy can supply you with a few uniforms on default, iResolution (aka uScreenResolution), 
-iGlobalTime, iMouse
-*/

@@ -74,6 +74,7 @@ Modified by Flix01. Added some structs and functions mostly ported from
 the OgreMath library (www.ogre3d.org) - MIT licensed.
 Very little testing has been done. Use it at your own risk.
 
+Ported code back to C89
 **/
 
 #ifndef MATH_3D_HEADER
@@ -110,29 +111,29 @@ Very little testing has been done. Use it at your own risk.
 //
 
 typedef struct { float x, y, z; } vec3_t;
-static inline vec3_t vec3(float x, float y, float z)        { return (vec3_t){ x, y, z }; }
+static __inline vec3_t vec3(float x, float y, float z)        { vec3_t v;v.x=x;v.y=y;v.z=z;return v; }
 
-static inline vec3_t v3_add   (vec3_t a, vec3_t b)          { return (vec3_t){ a.x + b.x, a.y + b.y, a.z + b.z }; }
-static inline vec3_t v3_adds  (vec3_t a, float s)           { return (vec3_t){ a.x + s,   a.y + s,   a.z + s   }; }
-static inline vec3_t v3_sub   (vec3_t a, vec3_t b)          { return (vec3_t){ a.x - b.x, a.y - b.y, a.z - b.z }; }
-static inline vec3_t v3_subs  (vec3_t a, float s)           { return (vec3_t){ a.x - s,   a.y - s,   a.z - s   }; }
-static inline vec3_t v3_mul   (vec3_t a, vec3_t b)          { return (vec3_t){ a.x * b.x, a.y * b.y, a.z * b.z }; }
-static inline vec3_t v3_muls  (vec3_t a, float s)           { return (vec3_t){ a.x * s,   a.y * s,   a.z * s   }; }
-static inline vec3_t v3_div   (vec3_t a, vec3_t b)          { return (vec3_t){ a.x / b.x, a.y / b.y, a.z / b.z }; }
-static inline vec3_t v3_divs  (vec3_t a, float s)           { return (vec3_t){ a.x / s,   a.y / s,   a.z / s   }; }
-static inline float  v3_length(vec3_t v)                    { return sqrtf(v.x*v.x + v.y*v.y + v.z*v.z);          }
-static inline vec3_t v3_norm  (vec3_t v);
-static inline float  v3_dot   (vec3_t a, vec3_t b)          { return a.x*b.x + a.y*b.y + a.z*b.z;                 }
-static inline vec3_t v3_proj  (vec3_t v, vec3_t onto);
-static inline vec3_t v3_cross (vec3_t a, vec3_t b);
-static inline float  v3_angle_between(vec3_t a, vec3_t b);
-static inline vec3_t v3_lerp(vec3_t a, vec3_t b,float t)   { float ct = 1.f-t;return (vec3_t){a.x*ct+b.x*t,a.y*ct+b.y*t,a.z*ct+b.z*t};}
+static __inline vec3_t v3_add   (vec3_t a, vec3_t b)          { return vec3( a.x + b.x, a.y + b.y, a.z + b.z ); }
+static __inline vec3_t v3_adds  (vec3_t a, float s)           { return vec3( a.x + s,   a.y + s,   a.z + s   ); }
+static __inline vec3_t v3_sub   (vec3_t a, vec3_t b)          { return vec3( a.x - b.x, a.y - b.y, a.z - b.z ); }
+static __inline vec3_t v3_subs  (vec3_t a, float s)           { return vec3( a.x - s,   a.y - s,   a.z - s   ); }
+static __inline vec3_t v3_mul   (vec3_t a, vec3_t b)          { return vec3( a.x * b.x, a.y * b.y, a.z * b.z ); }
+static __inline vec3_t v3_muls  (vec3_t a, float s)           { return vec3( a.x * s,   a.y * s,   a.z * s   ); }
+static __inline vec3_t v3_div   (vec3_t a, vec3_t b)          { return vec3( a.x / b.x, a.y / b.y, a.z / b.z ); }
+static __inline vec3_t v3_divs  (vec3_t a, float s)           { return vec3( a.x / s,   a.y / s,   a.z / s   ); }
+static __inline float  v3_length(vec3_t v)                    { return sqrt(v.x*v.x + v.y*v.y + v.z*v.z);          }
+static __inline vec3_t v3_norm  (vec3_t v);
+static __inline float  v3_dot   (vec3_t a, vec3_t b)          { return a.x*b.x + a.y*b.y + a.z*b.z;                 }
+static __inline vec3_t v3_proj  (vec3_t v, vec3_t onto);
+static __inline vec3_t v3_cross (vec3_t a, vec3_t b);
+static __inline float  v3_angle_between(vec3_t a, vec3_t b);
+static __inline vec3_t v3_lerp(vec3_t a, vec3_t b,float t)   { float ct = 1.f-t;return vec3(a.x*ct+b.x*t,a.y*ct+b.y*t,a.z*ct+b.z*t);}
               void   v3_print        (vec3_t v);
               void   v3_printp       (vec3_t v, int width, int precision);
               void   v3_fprint       (FILE* stream, vec3_t v);
               void   v3_fprintp      (FILE* stream, vec3_t v, int width, int precision);
-static inline const float* v3_cvalue_ptr(const vec3_t* v) {return &v->x;}
-static inline       float* v3_value_ptr (vec3_t* v)       {return &v->x;}
+static __inline const float* v3_cvalue_ptr(const vec3_t* v) {return &v->x;}
+static __inline       float* v3_value_ptr (vec3_t* v)       {return &v->x;}
 
 //
 // quaternions
@@ -142,20 +143,20 @@ static inline       float* v3_value_ptr (vec3_t* v)       {return &v->x;}
 // 
 
 typedef struct { float x, y, z, w; } quat_t;
-static inline quat_t quat(float x, float y, float z,float w)        { return (quat_t){ x, y, z, w }; }
+static __inline quat_t quat(float x, float y, float z,float w)        { quat_t q;q.x=x;q.y=y;q.z=z;q.w=w;return q; }
 
-static inline float  qt_dot   (quat_t a, quat_t b)          { return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;        }
-static inline float  qt_length2(quat_t q)                   { return q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; }
-static inline float  qt_length(quat_t q)                    { return sqrtf(q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w); }
-static inline quat_t qt_norm(quat_t q)                      { float len=qt_length(q);return quat(q.x/len,q.y/len,q.z/len,q.w/len);}
-//static inline quat_t qt_look_at_YX(vec3_t source_pos,vec3_t target_pos);
+static __inline float  qt_dot   (quat_t a, quat_t b)          { return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;        }
+static __inline float  qt_length2(quat_t q)                   { return q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; }
+static __inline float  qt_length(quat_t q)                    { return sqrt(q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w); }
+static __inline quat_t qt_norm(quat_t q)                      { float len=qt_length(q);return quat(q.x/len,q.y/len,q.z/len,q.w/len);}
+//static __inline quat_t qt_look_at_YX(vec3_t source_pos,vec3_t target_pos);
 			  quat_t qt_slerp(quat_t qStart,quat_t qEnd,float factor);
               void   qt_print        (quat_t q);
               void   qt_printp       (quat_t q, int width, int precision);
               void   qt_fprint       (FILE* stream, quat_t q);
               void   qt_fprintp      (FILE* stream, quat_t q, int width, int precision);
-static inline const float* qt_cvalue_ptr(const quat_t* q) {return &q->x;}
-static inline       float* qt_value_ptr (quat_t* q)       {return &q->x;}
+static __inline const float* qt_cvalue_ptr(const quat_t* q) {return &q->x;}
+static __inline       float* qt_value_ptr (quat_t* q)       {return &q->x;}
 
 
 
@@ -180,9 +181,9 @@ static inline       float* qt_value_ptr (quat_t* q)       {return &q->x;}
 // or on the whiteboard the indices and named members correspond to these
 // positions:
 // 
-// | m[0][0]  m[1][0]  m[2][0] |
-// | m[0][1]  m[1][1]  m[2][1] |
-// | m[0][2]  m[1][2]  m[2][2] |
+// | m00  m10  m20 |
+// | m01  m11  m21 |
+// | m02  m12  m22 |
 // 
 // | m00  m10  m20 |
 // | m01  m11  m21 |
@@ -207,33 +208,33 @@ typedef union {
 	};
 } mat3_t;
 
-static inline mat3_t mat3(
+static __inline mat3_t mat3(
 	float m00, float m10, float m20,
 	float m01, float m11, float m21,
 	float m02, float m12, float m22
 );
-static inline mat3_t mat3_rm(
+static __inline mat3_t mat3_rm(
 	float m00, float m01, float m02,
 	float m10, float m11, float m12,
 	float m20, float m21, float m22
 );
 
-static inline mat3_t m3_identity     ();
-static inline vec3_t m3_get_x_axis   (const mat3_t* matrix);
-static inline vec3_t m3_get_y_axis   (const mat3_t* matrix);
-static inline vec3_t m3_get_z_axis   (const mat3_t* matrix);
-static inline mat3_t m3_invert_XZ_axis(const mat3_t* matrix);
-static inline mat3_t m3_scaling      (vec3_t scale);
-static inline mat3_t m3_rotation_x   (float angle_in_rad);
-static inline mat3_t m3_rotation_y   (float angle_in_rad);
-static inline mat3_t m3_rotation_z   (float angle_in_rad);
+static __inline mat3_t m3_identity     ();
+static __inline vec3_t m3_get_x_axis   (const mat3_t* matrix);
+static __inline vec3_t m3_get_y_axis   (const mat3_t* matrix);
+static __inline vec3_t m3_get_z_axis   (const mat3_t* matrix);
+static __inline mat3_t m3_invert_XZ_axis(const mat3_t* matrix);
+static __inline mat3_t m3_scaling      (vec3_t scale);
+static __inline mat3_t m3_rotation_x   (float angle_in_rad);
+static __inline mat3_t m3_rotation_y   (float angle_in_rad);
+static __inline mat3_t m3_rotation_z   (float angle_in_rad);
               mat3_t m3_rotation     (float angle_in_rad, vec3_t axis);
               quat_t m3_get_quaternion(const mat3_t* matrix);
               void   m3_set_quaternion(mat3_t* matrix,quat_t q);
-static inline mat3_t m3_slerp(const mat3_t* T1,const mat3_t* T2,float t);
+static __inline mat3_t m3_slerp(const mat3_t* T1,const mat3_t* T2,float t);
 
-static inline mat3_t m3_transpose    (mat3_t matrix);
-static inline mat3_t m3_mul          (mat3_t a, mat3_t b);
+static __inline mat3_t m3_transpose    (mat3_t matrix);
+static __inline mat3_t m3_mul          (mat3_t a, mat3_t b);
               mat3_t m3_invert       (mat3_t matrix);
               vec3_t m3_mul_dir      (mat3_t matrix, vec3_t direction);
               mat3_t m3_from_euler_XYZ (const vec3_t YPR);
@@ -252,8 +253,8 @@ static inline mat3_t m3_mul          (mat3_t a, mat3_t b);
               void   m3_printp       (mat3_t matrix, int width, int precision);
               void   m3_fprint       (FILE* stream, mat3_t matrix);
               void   m3_fprintp      (FILE* stream, mat3_t matrix, int width, int precision);
-static inline const float* m3_cvalue_ptr(const mat3_t* m) {return &m->m00;}
-static inline       float* m3_value_ptr (mat3_t* m)       {return &m->m00;}
+static __inline const float* m3_cvalue_ptr(const mat3_t* m) {return &m->m00;}
+static __inline       float* m3_value_ptr (mat3_t* m)       {return &m->m00;}
 
 
 //
@@ -278,10 +279,10 @@ static inline       float* m3_value_ptr (mat3_t* m)       {return &m->m00;}
 // or on the whiteboard the indices and named members correspond to these
 // positions:
 // 
-// | m[0][0]  m[1][0]  m[2][0]  m[3][0] |
-// | m[0][1]  m[1][1]  m[2][1]  m[3][1] |
-// | m[0][2]  m[1][2]  m[2][2]  m[3][2] |
-// | m[0][3]  m[1][3]  m[2][3]  m[3][3] |
+// | m00  m10  m20  m30 |
+// | m01  m11  m21  m31 |
+// | m02  m12  m22  m32 |
+// | m03  m13  m23  m33 |
 // 
 // | m00  m10  m20  m30 |
 // | m01  m11  m21  m31 |
@@ -308,36 +309,36 @@ typedef union {
 	};
 } mat4_t;
 
-static inline mat4_t mat4(
+static __inline mat4_t mat4(
 	float m00, float m10, float m20, float m30,
 	float m01, float m11, float m21, float m31,
 	float m02, float m12, float m22, float m32,
 	float m03, float m13, float m23, float m33
 );
-static inline mat4_t mat4_rm(
+static __inline mat4_t mat4_rm(
 	float m00, float m01, float m02, float m03,
 	float m10, float m11, float m12, float m13,
 	float m20, float m21, float m22, float m23,
 	float m30, float m31, float m32, float m33
 );
 
-static inline mat4_t m4_identity     ();
-static inline void m4_set_identity_mat3(mat4_t* matrix);
-static inline mat3_t m4_get_mat3     (const mat4_t* matrix);
-static inline void m4_set_mat3       (mat4_t* matrix,mat3_t matrix3);
-static inline vec3_t m4_get_x_axis   (const mat4_t* matrix);
-static inline vec3_t m4_get_y_axis   (const mat4_t* matrix);
-static inline vec3_t m4_get_z_axis   (const mat4_t* matrix);
-static inline mat4_t m4_invert_XZ_axis(const mat4_t* matrix);
-static inline vec3_t m4_get_translation(const mat4_t* matrix);
-static inline void   m4_set_translation(mat4_t* matrix,vec3_t translation);
+static __inline mat4_t m4_identity     ();
+static __inline void m4_set_identity_mat3(mat4_t* matrix);
+static __inline mat3_t m4_get_mat3     (const mat4_t* matrix);
+static __inline void m4_set_mat3       (mat4_t* matrix,mat3_t matrix3);
+static __inline vec3_t m4_get_x_axis   (const mat4_t* matrix);
+static __inline vec3_t m4_get_y_axis   (const mat4_t* matrix);
+static __inline vec3_t m4_get_z_axis   (const mat4_t* matrix);
+static __inline mat4_t m4_invert_XZ_axis(const mat4_t* matrix);
+static __inline vec3_t m4_get_translation(const mat4_t* matrix);
+static __inline void   m4_set_translation(mat4_t* matrix,vec3_t translation);
               quat_t m4_get_quaternion(const mat4_t* matrix);
               void   m4_set_quaternion(mat4_t* matrix,quat_t q);
-static inline mat4_t m4_translation  (vec3_t offset);
-static inline mat4_t m4_scaling      (vec3_t scale);
-static inline mat4_t m4_rotation_x   (float angle_in_rad);
-static inline mat4_t m4_rotation_y   (float angle_in_rad);
-static inline mat4_t m4_rotation_z   (float angle_in_rad);
+static __inline mat4_t m4_translation  (vec3_t offset);
+static __inline mat4_t m4_scaling      (vec3_t scale);
+static __inline mat4_t m4_rotation_x   (float angle_in_rad);
+static __inline mat4_t m4_rotation_y   (float angle_in_rad);
+static __inline mat4_t m4_rotation_z   (float angle_in_rad);
               mat4_t m4_rotation     (float angle_in_rad, vec3_t axis);
 
               mat4_t m4_ortho_2d     (float left,float right, float bottom, float top);
@@ -348,20 +349,20 @@ static inline mat4_t m4_rotation_z   (float angle_in_rad);
               mat4_t m4_look_at      (float eyex,float eyey,float eyez,float centerx,float centery,float centerz,float upx,float upy,float upz);
 
 
-static inline mat4_t m4_transpose    (mat4_t matrix);
-static inline mat4_t m4_mul          (mat4_t a, mat4_t b);
+static __inline mat4_t m4_transpose    (mat4_t matrix);
+static __inline mat4_t m4_mul          (mat4_t a, mat4_t b);
               mat4_t m4_invert       (mat4_t matrix);
-static inline mat4_t m4_invert_fast  (mat4_t matrix);
+static __inline mat4_t m4_invert_fast  (mat4_t matrix);
               vec3_t m4_mul_pos      (mat4_t matrix, vec3_t position);
               vec3_t m4_mul_dir      (mat4_t matrix, vec3_t direction);
 			  void m4_look_at_YX	 (mat4_t* matrix,vec3_t to,float min_distance_allowed,float max_distance_allowed);
-static inline mat4_t m4_slerp(const mat4_t* T1,const mat4_t* T2,float t);
+static __inline mat4_t m4_slerp(const mat4_t* T1,const mat4_t* T2,float t);
               void   m4_print        (mat4_t matrix);
               void   m4_printp       (mat4_t matrix, int width, int precision);
               void   m4_fprint       (FILE* stream, mat4_t matrix);
               void   m4_fprintp      (FILE* stream, mat4_t matrix, int width, int precision);
-static inline const float* m4_cvalue_ptr(const mat4_t* m) {return &m->m00;}
-static inline       float* m4_value_ptr (mat4_t* m)       {return &m->m00;}
+static __inline const float* m4_cvalue_ptr(const mat4_t* m) {return &m->m00;}
+static __inline       float* m4_value_ptr (mat4_t* m)       {return &m->m00;}
 
 
 
@@ -369,27 +370,27 @@ static inline       float* m4_value_ptr (mat4_t* m)       {return &m->m00;}
 // 3D vector functions header implementation
 //
 
-static inline vec3_t v3_norm(vec3_t v) {
+static __inline vec3_t v3_norm(vec3_t v) {
 	float len = v3_length(v);
 	if (len > 0)
-		return (vec3_t){ v.x / len, v.y / len, v.z / len };
+		return vec3( v.x / len, v.y / len, v.z / len );
 	else
-		return (vec3_t){ 0, 0, 0};
+		return vec3( 0, 0, 0);
 }
 
-static inline vec3_t v3_proj(vec3_t v, vec3_t onto) {
+static __inline vec3_t v3_proj(vec3_t v, vec3_t onto) {
 	return v3_muls(onto, v3_dot(v, onto) / v3_dot(onto, onto));
 }
 
-static inline vec3_t v3_cross(vec3_t a, vec3_t b) {
-	return (vec3_t){
+static __inline vec3_t v3_cross(vec3_t a, vec3_t b) {
+	return vec3(
 		a.y * b.z - a.z * b.y,
 		a.z * b.x - a.x * b.z,
 		a.x * b.y - a.y * b.x
-	};
+	);
 }
 
-static inline float v3_angle_between(vec3_t a, vec3_t b) {
+static __inline float v3_angle_between(vec3_t a, vec3_t b) {
 	return acosf( v3_dot(a, b) / (v3_length(a) * v3_length(b)) );
 }
 
@@ -397,11 +398,11 @@ static inline float v3_angle_between(vec3_t a, vec3_t b) {
 // Quaternion header implementation
 //
 
-/*static inline quat_t qt_look_at_YX(vec3_t source_pos,vec3_t target_pos)	{
+/*static __inline quat_t qt_look_at_YX(vec3_t source_pos,vec3_t target_pos)	{
 	vec3_t D;float Dxz2,Dxz,AY,AX;
     D = target_pos-source_pos;
     Dxz2 = D.x*D.x+D.z*D.z;
-    Dxz = sqrtf(Dxz2);
+    Dxz = sqrt(Dxz2);
     AY = atan2(D.x,D.z);
     AX = -atan2(D.y,Dxz);
 	return qt_mul(qt_from_axis_angle(vec3(0.f,1.f,0.f),AY),qt_from_axis_angle(vec3(1.f,0.f,0.f),AX);
@@ -410,31 +411,31 @@ static inline float v3_angle_between(vec3_t a, vec3_t b) {
 //
 // Matrix3 functions header implementation
 //
-static inline mat3_t mat3(
+static __inline mat3_t mat3(
 	float m00, float m10, float m20,
 	float m01, float m11, float m21,
 	float m02, float m12, float m22
 ) {
-	return (mat3_t){
-		.m[0][0] = m00, .m[1][0] = m10, .m[2][0] = m20,
-		.m[0][1] = m01, .m[1][1] = m11, .m[2][1] = m21,
-		.m[0][2] = m02, .m[1][2] = m12, .m[2][2] = m22
-	};
+	mat3_t m; 
+	m.m00=m00; m.m10=m10; m.m20=m20;
+	m.m01=m01; m.m11=m11; m.m21=m21;
+	m.m02=m02; m.m12=m12; m.m22=m22;
+	return m;
 }
 
-static inline mat3_t mat3_rm(
+static __inline mat3_t mat3_rm(
 	float m00, float m01, float m02,
 	float m10, float m11, float m12,
 	float m20, float m21, float m22
 ) {
-	return (mat3_t){
-		.m[0][0] = m00, .m[1][0] = m10, .m[2][0] = m20,
-		.m[0][1] = m01, .m[1][1] = m11, .m[2][1] = m21,
-		.m[0][2] = m02, .m[1][2] = m12, .m[2][2] = m22
-	};
+	mat3_t m; 
+	m.m00=m00; m.m10=m10; m.m20=m20;
+	m.m01=m01; m.m11=m11; m.m21=m21;
+	m.m02=m02; m.m12=m12; m.m22=m22;
+	return m;
 }
 
-static inline mat3_t m3_identity() {
+static __inline mat3_t m3_identity() {
 	return mat3(
 		 1,  0,  0,
 		 0,  1,  0,
@@ -442,7 +443,7 @@ static inline mat3_t m3_identity() {
 	);
 }
 
-static inline mat3_t m3_scaling(vec3_t scale) {
+static __inline mat3_t m3_scaling(vec3_t scale) {
 	float x = scale.x, y = scale.y, z = scale.z;
 	return mat3(
 		 x,  0,  0,
@@ -451,28 +452,28 @@ static inline mat3_t m3_scaling(vec3_t scale) {
 	);
 }
 
-static inline vec3_t m3_get_x_axis(const mat3_t* matrix)	{
+static __inline vec3_t m3_get_x_axis(const mat3_t* matrix)	{
 	const mat3_t* m = matrix;
-	return (vec3_t){.x=m->m[0][0],.y=m->m[0][1],.z=m->m[0][2]};
+	return vec3(m->m00,m->m01,m->m02);
 }
 
-static inline vec3_t m3_get_y_axis(const mat3_t* matrix)	{
+static __inline vec3_t m3_get_y_axis(const mat3_t* matrix)	{
 	const mat3_t* m = matrix;
-	return (vec3_t){.x=m->m[1][0],.y=m->m[1][1],.z=m->m[1][2]};
+	return vec3(m->m10,m->m11,m->m12);
 }
 
-static inline vec3_t m3_get_z_axis(const mat3_t* matrix)	{
+static __inline vec3_t m3_get_z_axis(const mat3_t* matrix)	{
 	const mat3_t* m = matrix;
-	return (vec3_t){.x=m->m[2][0],.y=m->m[2][1],.z=m->m[2][2]};
+	return vec3(m->m20,m->m21,m->m22);
 }
 
-static inline mat3_t m3_invert_XZ_axis(const mat3_t* matrix) {
+static __inline mat3_t m3_invert_XZ_axis(const mat3_t* matrix) {
 	const mat3_t* m = matrix;
-	return (mat3_t){
-		.m[0][0] = -m->m[0][0], .m[1][0] = m->m[1][0], .m[2][0] = -m->m[2][0],
-		.m[0][1] = -m->m[0][1], .m[1][1] = m->m[1][1], .m[2][1] = -m->m[2][1],
-		.m[0][2] = -m->m[0][2], .m[1][2] = m->m[1][2], .m[2][2] = -m->m[2][2]
-    };	
+	return mat3 (
+		-m->m00, m->m10, -m->m20,
+		-m->m01, m->m11, -m->m21,
+		-m->m02, m->m12, -m->m22
+	);
 }
 
 /*
@@ -506,7 +507,7 @@ static inline mat3_t m3_invert_XZ_axis(const mat3_t* matrix) {
     }
 */
 
-static inline mat3_t m3_rotation_x(float angle_in_rad) {
+static __inline mat3_t m3_rotation_x(float angle_in_rad) {
 	float s = sinf(angle_in_rad), c = cosf(angle_in_rad);
 	return mat3(
 		1,  0,  0,
@@ -515,7 +516,7 @@ static inline mat3_t m3_rotation_x(float angle_in_rad) {
 	);
 }
 
-static inline mat3_t m3_rotation_y(float angle_in_rad) {
+static __inline mat3_t m3_rotation_y(float angle_in_rad) {
 	float s = sinf(angle_in_rad), c = cosf(angle_in_rad);
 	return mat3(
 		 c,  0,  s,
@@ -524,7 +525,7 @@ static inline mat3_t m3_rotation_y(float angle_in_rad) {
 	);
 }
 
-static inline mat3_t m3_rotation_z(float angle_in_rad) {
+static __inline mat3_t m3_rotation_z(float angle_in_rad) {
 	float s = sinf(angle_in_rad), c = cosf(angle_in_rad);
 	return mat3(
 		 c, -s,  0,
@@ -533,13 +534,13 @@ static inline mat3_t m3_rotation_z(float angle_in_rad) {
 	);
 }
 
-static inline mat3_t m3_transpose(mat3_t matrix) {
-	return mat3(matrix.m[0][0], matrix.m[0][1], matrix.m[0][2],
-                matrix.m[1][0], matrix.m[1][1], matrix.m[1][2],
-                matrix.m[2][0], matrix.m[2][1], matrix.m[2][2]);
+static __inline mat3_t m3_transpose(mat3_t matrix) {
+	return mat3(matrix.m00, matrix.m01, matrix.m02,
+                matrix.m10, matrix.m11, matrix.m12,
+                matrix.m20, matrix.m21, matrix.m22);
 }
 
-static inline mat3_t m3_slerp(const mat3_t* T1,const mat3_t* T2,float t)	{
+static __inline mat3_t m3_slerp(const mat3_t* T1,const mat3_t* T2,float t)	{
 	mat3_t m;
 	quat_t q = qt_slerp(m3_get_quaternion(T1),m3_get_quaternion(T2),t);
 	m3_set_quaternion(&m,q);
@@ -556,11 +557,11 @@ static inline mat3_t m3_slerp(const mat3_t* T1,const mat3_t* T2,float t)	{
  * But note that the article use the first index for rows and the second for
  * columns.
  */
-static inline mat3_t m3_mul(mat3_t a, mat3_t b) {
-	mat3_t result;
+static __inline mat3_t m3_mul(mat3_t a, mat3_t b) {
+	mat3_t result;int i,j;
 	
-	for(int i = 0; i < 3; i++) {
-		for(int j = 0; j < 3; j++) {
+	for(i = 0; i < 3; i++) {
+		for(j = 0; j < 3; j++) {
 			result.m[i][j] = a.m[0][j]*b.m[i][0] +
 							 a.m[1][j]*b.m[i][1] +
 							 a.m[2][j]*b.m[i][2];
@@ -574,35 +575,35 @@ static inline mat3_t m3_mul(mat3_t a, mat3_t b) {
 // Matrix4 functions header implementation
 //
 
-static inline mat4_t mat4(
+static __inline mat4_t mat4(
 	float m00, float m10, float m20, float m30,
 	float m01, float m11, float m21, float m31,
 	float m02, float m12, float m22, float m32,
 	float m03, float m13, float m23, float m33
 ) {
-	return (mat4_t){
-		.m[0][0] = m00, .m[1][0] = m10, .m[2][0] = m20, .m[3][0] = m30,
-		.m[0][1] = m01, .m[1][1] = m11, .m[2][1] = m21, .m[3][1] = m31,
-		.m[0][2] = m02, .m[1][2] = m12, .m[2][2] = m22, .m[3][2] = m32,
-		.m[0][3] = m03, .m[1][3] = m13, .m[2][3] = m23, .m[3][3] = m33
-	};
+	mat4_t m;
+	m.m00=m00; m.m10=m10; m.m20=m20; m.m30=m30;
+	m.m01=m01; m.m11=m11; m.m21=m21; m.m31=m31;
+	m.m02=m02; m.m12=m12; m.m22=m22; m.m32=m32;
+	m.m03=m03; m.m13=m13; m.m23=m23; m.m33=m33;
+	return m;
 }
 
-static inline mat4_t mat4_rm(
+static __inline mat4_t mat4_rm(
 	float m00, float m01, float m02, float m03,
 	float m10, float m11, float m12, float m13,
 	float m20, float m21, float m22, float m23,
 	float m30, float m31, float m32, float m33
 ) {
-	return (mat4_t){
-		.m[0][0] = m00, .m[1][0] = m10, .m[2][0] = m20, .m[3][0] = m30,
-		.m[0][1] = m01, .m[1][1] = m11, .m[2][1] = m21, .m[3][1] = m31,
-		.m[0][2] = m02, .m[1][2] = m12, .m[2][2] = m22, .m[3][2] = m32,
-		.m[0][3] = m03, .m[1][3] = m13, .m[2][3] = m23, .m[3][3] = m33
-	};
+	mat4_t m;
+	m.m00=m00; m.m10=m10; m.m20=m20; m.m30=m30;
+	m.m01=m01; m.m11=m11; m.m21=m21; m.m31=m31;
+	m.m02=m02; m.m12=m12; m.m22=m22; m.m32=m32;
+	m.m03=m03; m.m13=m13; m.m23=m23; m.m33=m33;
+	return m;
 }
 
-static inline mat4_t m4_identity() {
+static __inline mat4_t m4_identity() {
 	return mat4(
 		 1,  0,  0,  0,
 		 0,  1,  0,  0,
@@ -611,67 +612,67 @@ static inline mat4_t m4_identity() {
 	);
 }
 
-static inline void m4_set_identity_mat3(mat4_t* matrix) {
+static __inline void m4_set_identity_mat3(mat4_t* matrix) {
 	mat4_t* m = matrix;
-	m->m[0][0] = 1; m->m[1][0] = 0; m->m[2][0] = 0;
-	m->m[0][1] = 0; m->m[1][1] = 1; m->m[2][1] = 0;
-	m->m[0][2] = 0; m->m[1][2] = 0; m->m[2][2] = 1;
+	m->m00 = 1; m->m10 = 0; m->m20 = 0;
+	m->m01 = 0; m->m11 = 1; m->m21 = 0;
+	m->m02 = 0; m->m12 = 0; m->m22 = 1;
 }
 
-static inline mat3_t m4_get_mat3(const mat4_t* matrix)	{
+static __inline mat3_t m4_get_mat3(const mat4_t* matrix)	{
 	const mat4_t* m = matrix;
-	return (mat3_t){
-		.m[0][0] = m->m[0][0], .m[1][0] = m->m[1][0], .m[2][0] = m->m[2][0],
-		.m[0][1] = m->m[0][1], .m[1][1] = m->m[1][1], .m[2][1] = m->m[2][1],
-		.m[0][2] = m->m[0][2], .m[1][2] = m->m[1][2], .m[2][2] = m->m[2][2]
-    };
+	return mat3 (
+		m->m00, m->m10, m->m20,
+		m->m01, m->m11, m->m21,
+		m->m02, m->m12, m->m22
+    );
 }
 
-static inline void m4_set_mat3(mat4_t* matrix,mat3_t matrix3)	{
+static __inline void m4_set_mat3(mat4_t* matrix,mat3_t matrix3)	{
 	mat4_t* m = matrix;
-	m->m[0][0] = matrix3.m[0][0]; m->m[1][0] = matrix3.m[1][0]; m->m[2][0] = matrix3.m[2][0];
-	m->m[0][1] = matrix3.m[0][1]; m->m[1][1] = matrix3.m[1][1]; m->m[2][1] = matrix3.m[2][1];
-	m->m[0][2] = matrix3.m[0][2]; m->m[1][2] = matrix3.m[1][2]; m->m[2][2] = matrix3.m[2][2];
+	m->m00 = matrix3.m00; m->m10 = matrix3.m10; m->m20 = matrix3.m20;
+	m->m01 = matrix3.m01; m->m11 = matrix3.m11; m->m21 = matrix3.m21;
+	m->m02 = matrix3.m02; m->m12 = matrix3.m12; m->m22 = matrix3.m22;
 }
 
-static inline vec3_t m4_get_x_axis(const mat4_t* matrix)	{
+static __inline vec3_t m4_get_x_axis(const mat4_t* matrix)	{
 	const mat4_t* m = matrix;
-	return (vec3_t){.x=m->m[0][0],.y=m->m[0][1],.z=m->m[0][2]};
+	return vec3(m->m00,m->m01,m->m02);
 }
 
-static inline vec3_t m4_get_y_axis(const mat4_t* matrix)	{
+static __inline vec3_t m4_get_y_axis(const mat4_t* matrix)	{
 	const mat4_t* m = matrix;
-	return (vec3_t){.x=m->m[1][0],.y=m->m[1][1],.z=m->m[1][2]};
+	return vec3(m->m10,m->m11,m->m12);
 }
 
-static inline vec3_t m4_get_z_axis(const mat4_t* matrix)	{
+static __inline vec3_t m4_get_z_axis(const mat4_t* matrix)	{
 	const mat4_t* m = matrix;
-	return (vec3_t){.x=m->m[2][0],.y=m->m[2][1],.z=m->m[2][2]};
+	return vec3(m->m20,m->m21,m->m22);
 }
 
-static inline mat4_t m4_invert_XZ_axis(const mat4_t* matrix) {
+static __inline mat4_t m4_invert_XZ_axis(const mat4_t* matrix) {
 	const mat4_t* m = matrix;
-	return (mat4_t){
-		.m[0][0] = -m->m[0][0], .m[1][0] = m->m[1][0], .m[2][0] = -m->m[2][0], .m[3][0] = m->m[3][0],
-		.m[0][1] = -m->m[0][1], .m[1][1] = m->m[1][1], .m[2][1] = -m->m[2][1], .m[3][1] = m->m[3][1],
-		.m[0][2] = -m->m[0][2], .m[1][2] = m->m[1][2], .m[2][2] = -m->m[2][2], .m[3][2] = m->m[3][2],
-		.m[0][3] =  m->m[0][3], .m[1][3] = m->m[1][3], .m[2][3] =  m->m[2][3], .m[3][3] = m->m[3][3]    
-	};	
+	return mat4 (
+		-m->m00, m->m10, -m->m20, m->m30,
+		-m->m01, m->m11, -m->m21, m->m31,
+		-m->m02, m->m12, -m->m22, m->m32,
+		 m->m03, m->m13,  m->m23, m->m33
+	);
 }
 
-static inline vec3_t m4_get_translation(const mat4_t* matrix)	{
+static __inline vec3_t m4_get_translation(const mat4_t* matrix)	{
 	const mat4_t* m = matrix;
-	return (vec3_t){.x=m->m[3][0],.y=m->m[3][1],.z=m->m[3][2]};
+	return vec3(m->m30,m->m31,m->m32);
 }
 
-static inline void m4_set_translation(mat4_t* matrix,vec3_t translation) {
+static __inline void m4_set_translation(mat4_t* matrix,vec3_t translation) {
 	mat4_t* m = matrix;
-	m->m[3][0] = translation.x;
-	m->m[3][1] = translation.y;
-	m->m[3][2] = translation.z;	
+	m->m30 = translation.x;
+	m->m31 = translation.y;
+	m->m32 = translation.z;	
 }
 
-static inline mat4_t m4_translation(vec3_t offset) {
+static __inline mat4_t m4_translation(vec3_t offset) {
 	return mat4(
 		 1,  0,  0,  offset.x,
 		 0,  1,  0,  offset.y,
@@ -680,7 +681,7 @@ static inline mat4_t m4_translation(vec3_t offset) {
 	);
 }
 
-static inline mat4_t m4_scaling(vec3_t scale) {
+static __inline mat4_t m4_scaling(vec3_t scale) {
 	float x = scale.x, y = scale.y, z = scale.z;
 	return mat4(
 		 x,  0,  0,  0,
@@ -690,7 +691,7 @@ static inline mat4_t m4_scaling(vec3_t scale) {
 	);
 }
 
-static inline mat4_t m4_rotation_x(float angle_in_rad) {
+static __inline mat4_t m4_rotation_x(float angle_in_rad) {
 	float s = sinf(angle_in_rad), c = cosf(angle_in_rad);
 	return mat4(
 		1,  0,  0,  0,
@@ -700,7 +701,7 @@ static inline mat4_t m4_rotation_x(float angle_in_rad) {
 	);
 }
 
-static inline mat4_t m4_rotation_y(float angle_in_rad) {
+static __inline mat4_t m4_rotation_y(float angle_in_rad) {
 	float s = sinf(angle_in_rad), c = cosf(angle_in_rad);
 	return mat4(
 		 c,  0,  s,  0,
@@ -710,7 +711,7 @@ static inline mat4_t m4_rotation_y(float angle_in_rad) {
 	);
 }
 
-static inline mat4_t m4_rotation_z(float angle_in_rad) {
+static __inline mat4_t m4_rotation_z(float angle_in_rad) {
 	float s = sinf(angle_in_rad), c = cosf(angle_in_rad);
 	return mat4(
 		 c, -s,  0,  0,
@@ -720,14 +721,14 @@ static inline mat4_t m4_rotation_z(float angle_in_rad) {
 	);
 }
 
-static inline mat4_t m4_transpose(mat4_t matrix) {
-	return mat4(matrix.m[0][0], matrix.m[0][1], matrix.m[0][2], matrix.m[0][3],
-                matrix.m[1][0], matrix.m[1][1], matrix.m[1][2], matrix.m[1][3],
-                matrix.m[2][0], matrix.m[2][1], matrix.m[2][2], matrix.m[2][3],
-                matrix.m[3][0], matrix.m[3][1], matrix.m[3][2], matrix.m[3][3]);
+static __inline mat4_t m4_transpose(mat4_t matrix) {
+	return mat4(matrix.m00, matrix.m01, matrix.m02, matrix.m03,
+                matrix.m10, matrix.m11, matrix.m12, matrix.m13,
+                matrix.m20, matrix.m21, matrix.m22, matrix.m23,
+                matrix.m30, matrix.m31, matrix.m32, matrix.m33);
 }
 
-static inline mat4_t m4_slerp(const mat4_t* T1,const mat4_t* T2,float t)	{
+static __inline mat4_t m4_slerp(const mat4_t* T1,const mat4_t* T2,float t)	{
 	mat4_t m = m4_identity();
 	quat_t q = qt_slerp(m4_get_quaternion(T1),m4_get_quaternion(T2),t);
 	vec3_t l = v3_lerp(m4_get_translation(T1),m4_get_translation(T2),t);
@@ -746,10 +747,10 @@ static inline mat4_t m4_slerp(const mat4_t* T1,const mat4_t* T2,float t)	{
  * But note that the article use the first index for rows and the second for
  * columns.
  */
-static inline mat4_t m4_mul(mat4_t a, mat4_t b) {
-	mat4_t result;
-	for(int i = 0; i < 4; i++) {
-		for(int j = 0; j < 4; j++) {
+static __inline mat4_t m4_mul(mat4_t a, mat4_t b) {
+	mat4_t result;int i,j;
+	for(i = 0; i < 4; i++) {
+		for(j = 0; j < 4; j++) {
 			result.m[i][j] = 
 				a.m[0][j] * b.m[i][0] +
 				a.m[1][j] * b.m[i][1] +
@@ -765,11 +766,11 @@ static inline mat4_t m4_mul(mat4_t a, mat4_t b) {
     when rotation can be represented by an unit quaternion
     scaling is discarded
 */
-static inline mat4_t m4_invert_fast(mat4_t matrix)	{ 
-	mat4_t inv;
+static __inline mat4_t m4_invert_fast(mat4_t matrix)	{ 
+	mat4_t inv;vec3_t tra;
 	m4_set_mat3(&inv,m3_transpose(m4_get_mat3(&matrix)));
-	inv.m[3][0]=inv.m[3][1]=inv.m[3][2]=inv.m[0][3]=inv.m[1][3]=inv.m[2][3]=0.f;inv.m[3][3]=1.f;	
-	vec3_t tra = m4_get_translation(&matrix);
+	inv.m30=inv.m31=inv.m32=inv.m03=inv.m13=inv.m23=0.f;inv.m33=1.f;	
+	tra = m4_get_translation(&matrix);
 	tra.x=-tra.x;tra.y=-tra.y;tra.z=-tra.z;	
 	m4_set_translation(&inv,m4_mul_dir(inv,tra));	
 	return inv;
@@ -819,7 +820,7 @@ quat_t qt_slerp(quat_t qStart,quat_t qEnd,float factor) {
         float fSin,fAngle;
         if (!useAcosAndSinInsteadOfAtan2AndSqrt)	{
             // Ogre::Quaternion uses this branch by default
-            fSin = sqrtf(1.f - fCos*fCos);
+            fSin = sqrt(1.f - fCos*fCos);
             fAngle = atan2(fSin, fCos);
         }
         else	{
@@ -830,6 +831,7 @@ quat_t qt_slerp(quat_t qStart,quat_t qEnd,float factor) {
             fSin = sin(fAngle);
         }
 
+		{
         const float fInvSin = 1.f / fSin;
         const float fCoeff0 = sin((1.f - factor) * fAngle) * fInvSin;
         const float fCoeff1 = sin(factor * fAngle) * fInvSin;
@@ -839,6 +841,7 @@ quat_t qt_slerp(quat_t qStart,quat_t qEnd,float factor) {
         qOut.y = (fCoeff0 * qStart.y + fCoeff1 * qEnd.y);
         qOut.z = (fCoeff0 * qStart.z + fCoeff1 * qEnd.z);
         qOut.w = (fCoeff0 * qStart.w + fCoeff1 * qEnd.w);
+		}
     } else
     {
         // There are two situations:
@@ -921,18 +924,20 @@ mat3_t m3_invert(mat3_t matrix) {
 	float c00 =   m11*m22 - m12*m21,   c10 = -(m01*m22 - m02*m21),  c20 =   m01*m12 - m02*m11;
 	float c01 = -(m10*m22 - m12*m20),  c11 =   m00*m22 - m02*m20,   c21 = -(m00*m12 - m02*m10);
 	float c02 =   m10*m21 - m11*m20,   c12 = -(m00*m21 - m01*m20),  c22 =   m00*m11 - m01*m10;
-		
+
+	float i00,i10,i20, i01,i11,i21, i02,i12,i22;
+
 	// Caclculate the determinant by using the already calculated determinants
 	// in the cofactor matrix.
 	// Second sign is already minus from the cofactor matrix.
 	float det = m00*c00 + m10*c10 + m20 * c20;
-	if (fabsf(det) < 0.00001)
+	if (fabs(det) < 0.00001)
 		return m3_identity();
 		
 	// Calcuate inverse by dividing the transposed cofactor matrix by the determinant.
-	float i00 = c00 / det,  i10 = c01 / det,  i20 = c02 / det;
-	float i01 = c10 / det,  i11 = c11 / det,  i21 = c12 / det;
-	float i02 = c20 / det,  i12 = c21 / det,  i22 = c22 / det;
+	i00 = c00 / det;  i10 = c01 / det;  i20 = c02 / det;
+	i01 = c10 / det;  i11 = c11 / det;  i21 = c12 / det;
+	i02 = c20 / det;  i12 = c21 / det;  i22 = c22 / det;
 
 	// Combine the inverted R with the inverted translation
 	return mat3(
@@ -946,97 +951,98 @@ mat3_t m3_invert(mat3_t matrix) {
  * Multiplies a 3x3 matrix with a 3D vector representing a direction in 3D space.
  */
 vec3_t m3_mul_dir(mat3_t matrix, vec3_t direction) {
-    return (vec3_t) {matrix.m[0][0]*direction.x + matrix.m[1][0]*direction.y + matrix.m[2][0]*direction.z,
-                     matrix.m[0][1]*direction.x + matrix.m[1][1]*direction.y + matrix.m[2][1]*direction.z,
-                     matrix.m[0][2]*direction.x + matrix.m[1][2]*direction.y + matrix.m[2][2]*direction.z};
+    return vec3     (matrix.m00*direction.x + matrix.m10*direction.y + matrix.m20*direction.z,
+                     matrix.m01*direction.x + matrix.m11*direction.y + matrix.m21*direction.z,
+                     matrix.m02*direction.x + matrix.m12*direction.y + matrix.m22*direction.z);
 }
 
 
 // Not sure here if I have to invert m[i][j] with m[j][i]
 quat_t m3_get_quaternion(const mat3_t* matrix) {
 	const mat3_t* m = matrix;		
-	float trace = m->m[0][0] + m->m[1][1] + m->m[2][2];
+	float trace = m->m00 + m->m11 + m->m22;
 	float temp[4];
 	if (trace > 0.f) {
-		float s = sqrtf(trace + 1.0f);
+		float s = sqrt(trace + 1.0f);
 		temp[3]=(s * 0.5f);s = 0.5f / s;
-		temp[0]=((m->m[1][2] - m->m[2][1]) * s);
-		temp[1]=((m->m[2][0] - m->m[0][2]) * s);
-		temp[2]=((m->m[0][1] - m->m[1][0]) * s);
+		temp[0]=((m->m12 - m->m21) * s);
+		temp[1]=((m->m20 - m->m02) * s);
+		temp[2]=((m->m01 - m->m10) * s);
 	} 
 	else {
-		int i = m->m[0][0] < m->m[1][1] ? 
-			(m->m[1][1] < m->m[2][2] ? 2 : 1) :
-			(m->m[0][0] < m->m[2][2] ? 2 : 0); 
+		int i = m->m00 < m->m11 ? 
+			(m->m11 < m->m22 ? 2 : 1) :
+			(m->m00 < m->m22 ? 2 : 0); 
 		int j = (i + 1) % 3;  
 		int k = (i + 2) % 3;
-		float s = sqrtf(m->m[i][i] - m->m[j][j] - m->m[k][k] + 1.0f);
+		float s = sqrt(m->m[i][i] - m->m[j][j] - m->m[k][k] + 1.0f);
 		temp[i] = s * 0.5f;s = 0.5f / s;
 		temp[3] = (m->m[j][k] - m->m[k][j]) * s;
 		temp[j] = (m->m[i][j] + m->m[j][i]) * s;
 		temp[k] = (m->m[i][k] + m->m[k][i]) * s;
 	}
-	return (quat_t){temp[0],temp[1],temp[2],temp[3]};
+	return quat(temp[0],temp[1],temp[2],temp[3]);
 }
 // Not sure here if I have to invert m[i][j] with m[j][i]
 void  m3_set_quaternion(mat3_t* matrix,quat_t q)	{
 	mat3_t* m = matrix;
 	float d = qt_length2(q);
 	if (d == 0.0f) {*m = m3_identity();return;}
-
+	{
 	float s = 2.0f / d;
 	float xs = q.x * s,   ys = q.y * s,   zs = q.z * s;
 	float wx = q.w * xs,  wy = q.w * ys,  wz = q.w * zs;
 	float xx = q.x * xs,  xy = q.x * ys,  xz = q.x * zs;
 	float yy = q.y * ys,  yz = q.y * zs,  zz = q.z * zs;
 
-	m->m[0][0] = 1.0f - (yy + zz); m->m[1][0] = xy - wz;           m->m[2][0] = xz + wy;
-	m->m[0][1] = xy + wz;          m->m[1][1] = 1.0f - (xx + zz);  m->m[2][1] = yz - wx;
-	m->m[0][2] = xz - wy;          m->m[1][2] = yz + wx;           m->m[2][2] = 1.0f - (xx + yy);
+	m->m00 = 1.0f - (yy + zz); m->m10 = xy - wz;           m->m20 = xz + wy;
+	m->m01 = xy + wz;          m->m11 = 1.0f - (xx + zz);  m->m21 = yz - wx;
+	m->m02 = xz - wy;          m->m12 = yz + wx;           m->m22 = 1.0f - (xx + yy);
+	}
 }
 
 // Not sure here if I have to invert m[i][j] with m[j][i]
 quat_t m4_get_quaternion(const mat4_t* matrix) {
 	const mat4_t* m = matrix;		
-	float trace = m->m[0][0] + m->m[1][1] + m->m[2][2];
+	float trace = m->m00 + m->m11 + m->m22;
 	float temp[4];
 	if (trace > 0.f) {
-		float s = sqrtf(trace + 1.0f);
+		float s = sqrt(trace + 1.0f);
 		temp[3]=(s * 0.5f);s = 0.5f / s;
-		temp[0]=((m->m[1][2] - m->m[2][1]) * s);
-		temp[1]=((m->m[2][0] - m->m[0][2]) * s);
-		temp[2]=((m->m[0][1] - m->m[1][0]) * s);
+		temp[0]=((m->m12 - m->m21) * s);
+		temp[1]=((m->m20 - m->m02) * s);
+		temp[2]=((m->m01 - m->m10) * s);
 	} 
 	else {
-		int i = m->m[0][0] < m->m[1][1] ? 
-			(m->m[1][1] < m->m[2][2] ? 2 : 1) :
-			(m->m[0][0] < m->m[2][2] ? 2 : 0); 
+		int i = m->m00 < m->m11 ? 
+			(m->m11 < m->m22 ? 2 : 1) :
+			(m->m00 < m->m22 ? 2 : 0); 
 		int j = (i + 1) % 3;  
 		int k = (i + 2) % 3;
-		float s = sqrtf(m->m[i][i] - m->m[j][j] - m->m[k][k] + 1.0f);
+		float s = sqrt(m->m[i][i] - m->m[j][j] - m->m[k][k] + 1.0f);
 		temp[i] = s * 0.5f;s = 0.5f / s;
 		temp[3] = (m->m[j][k] - m->m[k][j]) * s;
 		temp[j] = (m->m[i][j] + m->m[j][i]) * s;
 		temp[k] = (m->m[i][k] + m->m[k][i]) * s;
 	}
-	return (quat_t){temp[0],temp[1],temp[2],temp[3]};
+	return quat(temp[0],temp[1],temp[2],temp[3]);
 }
 // Not sure here if I have to invert m[i][j] with m[j][i]
 void m4_set_quaternion(mat4_t* matrix,quat_t q)	{
 	mat4_t* m = matrix;
 	float d = qt_length2(q);
 	if (d == 0.0f) {m4_set_identity_mat3(m);return;}
-
+	{
 	float s = 2.0f / d;
 	float xs = q.x * s,   ys = q.y * s,   zs = q.z * s;
 	float wx = q.w * xs,  wy = q.w * ys,  wz = q.w * zs;
 	float xx = q.x * xs,  xy = q.x * ys,  xz = q.x * zs;
 	float yy = q.y * ys,  yz = q.y * zs,  zz = q.z * zs;
 
-	m->m[0][0] = 1.0f - (yy + zz); m->m[1][0] = xy - wz;           m->m[2][0] = xz + wy;
-	m->m[0][1] = xy + wz;          m->m[1][1] = 1.0f - (xx + zz);  m->m[2][1] = yz - wx;
-	m->m[0][2] = xz - wy;          m->m[1][2] = yz + wx;           m->m[2][2] = 1.0f - (xx + yy);
-
+	m->m00 = 1.0f - (yy + zz); m->m10 = xy - wz;           m->m20 = xz + wy;
+	m->m01 = xy + wz;          m->m11 = 1.0f - (xx + zz);  m->m21 = yz - wx;
+	m->m02 = xz - wy;          m->m12 = yz + wx;           m->m22 = 1.0f - (xx + yy);
+	}
 }
 
 /**
@@ -1051,7 +1057,7 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
 	T = m4_get_translation(matrix);
     D = v3_sub(to,T);
     Dxz2 = D.x*D.x+D.z*D.z;
-    Dxz = sqrtf(Dxz2);
+    Dxz = sqrt(Dxz2);
     AY = atan2(D.x,D.z);
     AX = -atan2(D.y,Dxz);
 	basis = m3_from_euler_YXZ(vec3(AY,AX,0));
@@ -1059,7 +1065,7 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
 	if (min_distance_allowed<0) min_distance_allowed=0;
 	if (max_distance_allowed<0) max_distance_allowed=0;		
 	if (min_distance_allowed<max_distance_allowed)	{
- 		float distance=sqrtf(Dxz2+D.y*D.y);
+ 		float distance=sqrt(Dxz2+D.y*D.y);
 		vec3_t zAxis = m4_get_z_axis(matrix);		
  		if (distance<min_distance_allowed) 			
 			m4_set_translation(matrix,v3_add(T,v3_muls(zAxis,distance-min_distance_allowed)));
@@ -1116,7 +1122,7 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
 
         return m3_mul(kXMat,m3_mul(kZMat,kYMat));
     }
-    mat3_t m3_from_euler_YXZ (vec3_t YPR)
+    mat3_t m3_from_euler_YXZ (const vec3_t YPR)
     {
         mat3_t kXMat,kYMat,kZMat;
         float fCos, fSin;
@@ -1132,7 +1138,7 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
 
         return m3_mul(kYMat,m3_mul(kXMat,kZMat));
     }
-    mat3_t m3_from_euler_YZX (vec3_t YPR)
+    mat3_t m3_from_euler_YZX (const vec3_t YPR)
     {
         mat3_t kXMat,kYMat,kZMat;
         float fCos, fSin;
@@ -1148,7 +1154,7 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
 
         return m3_mul(kYMat,m3_mul(kZMat,kXMat));
     }
-    mat3_t m3_from_euler_ZXY (vec3_t YPR)
+    mat3_t m3_from_euler_ZXY (const vec3_t YPR)
     {
         mat3_t kXMat,kYMat,kZMat;
         float fCos, fSin;
@@ -1164,7 +1170,7 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
 
         return m3_mul(kZMat,m3_mul(kXMat,kYMat));
     }
-    mat3_t m3_from_euler_ZYX (vec3_t YPR)
+    mat3_t m3_from_euler_ZYX (const vec3_t YPR)
     {
         mat3_t kXMat,kYMat,kZMat;
         float fCos, fSin;
@@ -1203,19 +1209,19 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
         //        cz*sx*sy+cx*sz  cx*cz-sx*sy*sz -cy*sx
         //       -cx*cz*sy+sx*sz  cz*sx+cx*sy*sz  cx*cy
 
-        YPR->y = asin(m->m[2][0]);
+        YPR->y = asin(m->m20);
         if ( YPR->y < M_HALF_PI )
         {
             if ( YPR->y > -M_HALF_PI )
             {
-                YPR->x = atan2(-m->m[2][1],m->m[2][2]);
-                YPR->z = atan2(-m->m[1][0],m->m[0][0]);
+                YPR->x = atan2(-m->m21,m->m22);
+                YPR->z = atan2(-m->m10,m->m00);
                 return 1;
             }
             else
             {
                 // WARNING.  Not a unique solution.
-                float fRmY = atan2(m->m[0][1],m->m[1][1]);
+                float fRmY = atan2(m->m01,m->m11);
                 YPR->z = 0;  // any angle works
                 YPR->x = YPR->z - fRmY;
                 return 0;
@@ -1224,7 +1230,7 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
         else
         {
             // WARNING.  Not a unique solution.
-            float fRpY = atan2(m->m[1][0],m->m[1][1]);
+            float fRpY = atan2(m->m10,m->m11);
             YPR->z = 0;  // any angle works
             YPR->x = fRpY - YPR->z;
             return 0;
@@ -1236,19 +1242,19 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
         //        sx*sy+cx*cy*sz  cx*cz          -cy*sx+cx*sy*sz
         //       -cx*sy+cy*sx*sz  cz*sx           cx*cy+sx*sy*sz
 
-        YPR->y = asin(-m->m[1][0]);
+        YPR->y = asin(-m->m10);
         if ( YPR->y < M_HALF_PI )
         {
             if ( YPR->y > -M_HALF_PI )
             {
-                YPR->x = atan2(m->m[1][2],m->m[1][1]);
-                YPR->z = atan2(m->m[2][0],m->m[0][0]);
+                YPR->x = atan2(m->m12,m->m11);
+                YPR->z = atan2(m->m20,m->m00);
                 return 1;
             }
             else
             {
                 // WARNING.  Not a unique solution.
-                float fRmY = atan2(-m->m[2][0],m->m[2][2]);
+                float fRmY = atan2(-m->m20,m->m22);
                 YPR->z = 0;  // any angle works
                 YPR->x = YPR->z - fRmY;
                 return 0;
@@ -1257,7 +1263,7 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
         else
         {
             // WARNING.  Not a unique solution.
-            float fRpY = atan2(-m->m[0][2],m->m[2][2]);
+            float fRpY = atan2(-m->m02,m->m22);
             YPR->z = 0;  // any angle works
             YPR->x = fRpY - YPR->z;
             return 0;
@@ -1269,19 +1275,19 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
         //        cx*sz           cx*cz          -sx
         //       -cz*sy+cy*sx*sz  cy*cz*sx+sy*sz  cx*cy
 
-        YPR->y = asin(-m->m[2][1]);
+        YPR->y = asin(-m->m21);
         if ( YPR->y < M_HALF_PI )
         {
             if ( YPR->y > -M_HALF_PI )
             {
-                YPR->x = atan2(m->m[2][0],m->m[2][2]);
-                YPR->z = atan2(m->m[0][1],m->m[1][1]);
+                YPR->x = atan2(m->m20,m->m22);
+                YPR->z = atan2(m->m01,m->m11);
                 return 1;
             }
             else
             {
                 // WARNING.  Not a unique solution.
-                float fRmY = atan2(-m->m[1][0],m->m[0][0]);
+                float fRmY = atan2(-m->m10,m->m00);
                 YPR->z = 0;  // any angle works
                 YPR->x = YPR->z - fRmY;
                 return 0;
@@ -1290,7 +1296,7 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
         else
         {
             // WARNING.  Not a unique solution.
-            float fRpY = atan2(-m->m[1][0],m->m[0][0]);
+            float fRpY = atan2(-m->m10,m->m00);
             YPR->z = 0;  // any angle works
             YPR->x = fRpY - YPR->z;
             return 0;
@@ -1302,19 +1308,19 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
         //        sz              cx*cz          -cz*sx
         //       -cz*sy           cy*sx+cx*sy*sz  cx*cy-sx*sy*sz
 
-        YPR->y = asin(m->m[0][1]);
+        YPR->y = asin(m->m01);
         if ( YPR->y < M_HALF_PI )
         {
             if ( YPR->y > -M_HALF_PI )
             {
-                YPR->x = atan2(-m->m[0][2],m->m[0][0]);
-                YPR->z = atan2(-m->m[2][1],m->m[1][1]);
+                YPR->x = atan2(-m->m02,m->m00);
+                YPR->z = atan2(-m->m21,m->m11);
                 return 1;
             }
             else
             {
                 // WARNING.  Not a unique solution.
-                float fRmY = atan2(m->m[1][2],m->m[2][2]);
+                float fRmY = atan2(m->m12,m->m22);
                 YPR->z = 0;  // any angle works
                 YPR->x = YPR->z - fRmY;
                 return 0;
@@ -1323,7 +1329,7 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
         else
         {
             // WARNING.  Not a unique solution.
-            float fRpY = atan2(m->m[1][2],m->m[2][2]);
+            float fRpY = atan2(m->m12,m->m22);
             YPR->z = 0;  // any angle works
             YPR->x = fRpY - YPR->z;
             return 0;
@@ -1335,19 +1341,19 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
         //        cz*sx*sy+cy*sz  cx*cz          -cy*cz*sx+sy*sz
         //       -cx*sy           sx              cx*cy
 
-        YPR->y = asin(m->m[1][2]);
+        YPR->y = asin(m->m12);
         if ( YPR->y < M_HALF_PI )
         {
             if ( YPR->y > -M_HALF_PI )
             {
-                YPR->x = atan2(-m->m[1][0],m->m[1][1]);
-                YPR->z = atan2(-m->m[0][2],m->m[2][2]);
+                YPR->x = atan2(-m->m10,m->m11);
+                YPR->z = atan2(-m->m02,m->m22);
                 return 1;
             }
             else
             {
                 // WARNING.  Not a unique solution.
-                float fRmY = atan2(m->m[2][0],m->m[0][0]);
+                float fRmY = atan2(m->m20,m->m00);
                 YPR->z = 0;  // any angle works
                 YPR->x = YPR->z - fRmY;
                 return 0;
@@ -1356,7 +1362,7 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
         else
         {
             // WARNING.  Not a unique solution.
-            float fRpY = atan2(m->m[2][0],m->m[0][0]);
+            float fRpY = atan2(m->m20,m->m00);
             YPR->z = 0;  // any angle works
             YPR->x = fRpY - YPR->z;
             return 0;
@@ -1368,19 +1374,19 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
         //        cy*sz           cx*cz+sx*sy*sz -cz*sx+cx*sy*sz
         //       -sy              cy*sx           cx*cy
 
-        YPR->y = asin(-m->m[0][2]);
+        YPR->y = asin(-m->m02);
         if ( YPR->y < M_HALF_PI )
         {
             if ( YPR->y > -M_HALF_PI )
             {
-                YPR->x = atan2(m->m[0][1],m->m[0][0]);
-                YPR->z = atan2(m->m[1][2],m->m[2][2]);
+                YPR->x = atan2(m->m01,m->m00);
+                YPR->z = atan2(m->m12,m->m22);
                 return 1;
             }
             else
             {
                 // WARNING.  Not a unique solution.
-                float fRmY = atan2(-m->m[1][0],m->m[2][0]);
+                float fRmY = atan2(-m->m10,m->m20);
                 YPR->z = 0;  // any angle works
                 YPR->x = YPR->z - fRmY;
                 return 0;
@@ -1389,7 +1395,7 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
         else
         {
             // WARNING.  Not a unique solution.
-            float fRpY = atan2(-m->m[1][0],m->m[2][0]);
+            float fRpY = atan2(-m->m10,m->m20);
             YPR->z = 0;  // any angle works
             YPR->x = fRpY - YPR->z;
             return 0;
@@ -1410,8 +1416,8 @@ void m3_fprint(FILE* stream, mat3_t matrix) {
 }
 
 void m3_fprintp(FILE* stream, mat3_t matrix, int width, int precision) {
-	int w = width, p = precision;
-	for(int r = 0; r < 3; r++) {
+	int w = width, p = precision, r;
+	for(r = 0; r < 3; r++) {
 		fprintf(stream, "| %*.*f %*.*f %*.*f |\n",
 			w, p, matrix.m[0][r], w, p, matrix.m[1][r], w, p, matrix.m[2][r]
 		);
@@ -1447,25 +1453,25 @@ void m3_fprintp(FILE* stream, mat3_t matrix, int width, int precision) {
         if (Drl==0) {right+=eps;left-=eps;Drl=right-left;}
         if (Dtb==0) {top+=eps;bottom-=eps;Dtb=top-bottom;}
         
-        res.m[0][0] = 2.f/Drl;
-        res.m[0][1] = 0;
-        res.m[0][2] = 0;
-        res.m[0][3] = 0;
+        res.m00 = 2.f/Drl;
+        res.m01 = 0;
+        res.m02 = 0;
+        res.m03 = 0;
 
-        res.m[1][0] = 0;
-        res.m[1][1] = 2.f/Dtb;
-        res.m[1][2] = 0;
-        res.m[1][3] = 0;
+        res.m10 = 0;
+        res.m11 = 2.f/Dtb;
+        res.m12 = 0;
+        res.m13 = 0;
 
-        res.m[2][0] = 0;
-        res.m[2][1] = 0;
-        res.m[2][2] = -1;
-        res.m[2][3] = 0;
+        res.m20 = 0;
+        res.m21 = 0;
+        res.m22 = -1;
+        res.m23 = 0;
 
-        res.m[3][0] = -(right+left)/Drl;
-        res.m[3][1] = -(top+bottom)/Dtb;
-        res.m[3][2] = 0;
-        res.m[3][3] = 1;
+        res.m30 = -(right+left)/Drl;
+        res.m31 = -(top+bottom)/Dtb;
+        res.m32 = 0;
+        res.m33 = 1;
 
         return res;
     }
@@ -1483,55 +1489,55 @@ void m3_fprintp(FILE* stream, mat3_t matrix, int width, int precision) {
         if (Dtb==0) {top+=eps;bottom-=eps;Dtb=top-bottom;}
         if (Dfn==0) {farVal+=eps;nearVal-=eps;Dfn=farVal-nearVal;}
 
-        res.m[0][0] = 2.f/Drl;
-        res.m[0][1] = 0;
-        res.m[0][2] = 0;
-        res.m[0][3] = 0;
+        res.m00 = 2.f/Drl;
+        res.m01 = 0;
+        res.m02 = 0;
+        res.m03 = 0;
 
-        res.m[1][0] = 0;
-        res.m[1][1] = 2.f/Dtb;
-        res.m[1][2] = 0;
-        res.m[1][3] = 0;
+        res.m10 = 0;
+        res.m11 = 2.f/Dtb;
+        res.m12 = 0;
+        res.m13 = 0;
 
-        res.m[2][0] = 0;
-        res.m[2][1] = 0;
-        res.m[2][2] = -2.f/Dfn;
-        res.m[2][3] = 0;
+        res.m20 = 0;
+        res.m21 = 0;
+        res.m22 = -2.f/Dfn;
+        res.m23 = 0;
 
-        res.m[3][0] = -(right+left)/Drl;
-        res.m[3][1] = -(top+bottom)/Dtb;
-        res.m[3][2] = (farVal+nearVal)/Dfn;
-        res.m[3][3] = 1;
+        res.m30 = -(right+left)/Drl;
+        res.m31 = -(top+bottom)/Dtb;
+        res.m32 = (farVal+nearVal)/Dfn;
+        res.m33 = 1;
 
         return res;
     }
     mat4_t m4_perspective(float fovy,float aspect, float zNear, float zFar) {
         mat4_t res;
 		const float eps = 0.0001f;
-        if (aspect==0) aspect = 1.f;
         float f = 1.f/tan(fovy*1.5707963268f/180.0); //cotg
         float Dfn = (zFar-zNear);
         if (Dfn==0) {zFar+=eps;zNear-=eps;Dfn=zFar-zNear;}
+		if (aspect==0) aspect = 1.f;
+        
+        res.m00 = f/aspect;
+        res.m01 = 0;
+        res.m02 = 0;
+        res.m03 = 0;
 
-        res.m[0][0] = f/aspect;
-        res.m[0][1] = 0;
-        res.m[0][2] = 0;
-        res.m[0][3] = 0;
+        res.m10 = 0;
+        res.m11 = f;
+        res.m12 = 0;
+        res.m13 = 0;
 
-        res.m[1][0] = 0;
-        res.m[1][1] = f;
-        res.m[1][2] = 0;
-        res.m[1][3] = 0;
+        res.m20 = 0;
+        res.m21 = 0;
+        res.m22 = -(zFar+zNear)/Dfn;	
+        res.m23 = -1;
 
-        res.m[2][0] = 0;
-        res.m[2][1] = 0;
-        res.m[2][2] = -(zFar+zNear)/Dfn;	
-        res.m[2][3] = -1;
-
-        res.m[3][0] = 0;
-        res.m[3][1] = 0;
-        res.m[3][2] = -2.f*zFar*zNear/Dfn;	
-        res.m[3][3] = 0;
+        res.m30 = 0;
+        res.m31 = 0;
+        res.m32 = -2.f*zFar*zNear/Dfn;	
+        res.m33 = 0;
 
         return res;
     }
@@ -1549,25 +1555,25 @@ void m3_fprintp(FILE* stream, mat3_t matrix, int width, int precision) {
         if (Dtb==0) {top+=eps;bottom-=eps;Dtb=top-bottom;}
         if (Dfn==0) {zFar+=eps;zNear-=eps;Dfn=zFar-zNear;}
 
-        res.m[0][0] = 2.f*zNear/Drl;
-        res.m[0][1] = 0;
-        res.m[0][2] = 0;
-        res.m[0][3] = 0;
+        res.m00 = 2.f*zNear/Drl;
+        res.m01 = 0;
+        res.m02 = 0;
+        res.m03 = 0;
 
-        res.m[1][0] = 0;
-        res.m[1][1] = 2.f*zNear/Dtb;
-        res.m[1][2] = 0;
-        res.m[1][3] = 0;
+        res.m10 = 0;
+        res.m11 = 2.f*zNear/Dtb;
+        res.m12 = 0;
+        res.m13 = 0;
 
-        res.m[2][0] = (right+left)/Drl;
-        res.m[2][1] = (top+bottom)/Dtb;
-        res.m[2][2] = -(zFar+zNear)/Dfn;
-        res.m[2][3] = -1;
+        res.m20 = (right+left)/Drl;
+        res.m21 = (top+bottom)/Dtb;
+        res.m22 = -(zFar+zNear)/Dfn;
+        res.m23 = -1;
 
-        res.m[3][0] = 0;
-        res.m[3][1] = 0;
-        res.m[3][2] = -2.f*zFar*zNear/Dfn;
-        res.m[3][3] = 0;
+        res.m30 = 0;
+        res.m31 = 0;
+        res.m32 = -2.f*zFar*zNear/Dfn;
+        res.m33 = 0;
 
         return res;
     }
@@ -1577,18 +1583,20 @@ void m3_fprintp(FILE* stream, mat3_t matrix, int width, int precision) {
 		const float eps = 0.0001f;        
         
         float F[3] = {eyex-centerx,eyey-centery,eyez-centerz};
-        float length = F[0]*F[0]+F[1]*F[1]+F[2]*F[2];if (length==0) length = eps;
-        length = sqrt(length); 
-        F[0]/=length;F[1]/=length;F[2]/=length;
-
+        float length = F[0]*F[0]+F[1]*F[1]+F[2]*F[2];	// length2 now
         float up[3] = {upx,upy,upz};
 
         float S[3] = {up[1]*F[2]-up[2]*F[1],up[2]*F[0]-up[0]*F[2],up[0]*F[1]-up[1]*F[0]};
+		float U[3] = {F[1]*S[2]-F[2]*S[1],F[2]*S[0]-F[0]*S[2],F[0]*S[1]-F[1]*S[0]};
+        
+		if (length==0) length = eps;
+        length = sqrt(length); 
+        F[0]/=length;F[1]/=length;F[2]/=length;
+
         length = S[0]*S[0]+S[1]*S[1]+S[2]*S[2];if (length==0) length = eps;
         length = sqrt(length);  //btSqrt ?
         S[0]/=length;S[1]/=length;S[2]/=length;
 
-        float U[3] = {F[1]*S[2]-F[2]*S[1],F[2]*S[0]-F[0]*S[2],F[0]*S[1]-F[1]*S[0]};
         length = U[0]*U[0]+U[1]*U[1]+U[2]*U[2];if (length==0) length = eps;
         length = sqrt(length);  
         U[0]/=length;U[1]/=length;U[2]/=length;
@@ -1600,25 +1608,25 @@ void m3_fprintp(FILE* stream, mat3_t matrix, int width, int precision) {
                 0	0	0	1		0	0	0	1
 
             */
-        res.m[0][0] = S[0];
-        res.m[0][1] = U[0];
-        res.m[0][2] = F[0];
-        res.m[0][3] = 0;
+        res.m00 = S[0];
+        res.m01 = U[0];
+        res.m02 = F[0];
+        res.m03 = 0;
 
-        res.m[1][0] = S[1];
-        res.m[1][1] = U[1];
-        res.m[1][2] = F[1];
-        res.m[1][3] = 0;
+        res.m10 = S[1];
+        res.m11 = U[1];
+        res.m12 = F[1];
+        res.m13 = 0;
 
-        res.m[2][0] = S[2];
-        res.m[2][1] = U[2];
-        res.m[2][2] = F[2];
-        res.m[2][3] = 0;
+        res.m20 = S[2];
+        res.m21 = U[2];
+        res.m22 = F[2];
+        res.m23 = 0;
 
-        res.m[3][0] = -S[0]*eyex -S[1]*eyey -S[2]*eyez;
-        res.m[3][1] = -U[0]*eyex -U[1]*eyey -U[2]*eyez;
-        res.m[3][2] = -F[0]*eyex -F[1]*eyey -F[2]*eyez;
-        res.m[3][3] = 1;
+        res.m30 = -S[0]*eyex -S[1]*eyey -S[2]*eyez;
+        res.m31 = -U[0]*eyex -U[1]*eyey -U[2]*eyez;
+        res.m32 = -F[0]*eyex -F[1]*eyey -F[2]*eyez;
+        res.m33 = 1;
 
         return res;
     }
@@ -1629,9 +1637,8 @@ void m3_fprintp(FILE* stream, mat3_t matrix, int width, int precision) {
  * every time the distance between the camera and the camera target changes.
 */
 mat4_t m4_ortho_3d(float cameraTargetDistance,float degFOV,float aspect,float znear,float zfar)	{
-		const float FOVTG=tanf(degFOV*1.5707963268f/180.0);
-		float y;//=(zfar-znear)*0.5f;
-		y=cameraTargetDistance*FOVTG;
+		const float FOVTG=tan(degFOV*1.5707963268f/180.0);
+		float y=cameraTargetDistance*FOVTG;//=(zfar-znear)*0.5f;
 		float x=y*aspect;
 		return m4_ortho( -x, x, -y, y, znear, zfar);
 	}
@@ -1698,7 +1705,7 @@ mat4_t m4_ortho_3d(float cameraTargetDistance,float degFOV,float aspect,float zn
  */
 /*mat4_t m4_perspective(float vertical_field_of_view_in_deg, float aspect_ratio, float near_view_distance, float far_view_distance) {
 	float fovy_in_rad = vertical_field_of_view_in_deg / 180 * M_PI;
-	float f = 1.0f / tanf(fovy_in_rad / 2.0f);
+	float f = 1.0f / tan(fovy_in_rad / 2.0f);
 	float ar = aspect_ratio;
 	float nd = near_view_distance, fd = far_view_distance;
 	
@@ -1792,24 +1799,24 @@ mat4_t m4_ortho_3d(float cameraTargetDistance,float degFOV,float aspect,float zn
  */
 mat4_t m4_invert(mat4_t matrix) {
 
-	if (matrix.m[0][3] == 0 && matrix.m[1][3] == 0 && matrix.m[2][3] == 0 && matrix.m[3][3] == 1)	{
+	if (matrix.m03 == 0 && matrix.m13 == 0 && matrix.m23 == 0 && matrix.m33 == 1)	{
 		// Affine
 
-        float m10 = matrix.m[1][0], m11 = matrix.m[1][1], m12 = matrix.m[1][2];
-        float m20 = matrix.m[2][0], m21 = matrix.m[2][1], m22 = matrix.m[2][2];
+        float m10 = matrix.m10, m11 = matrix.m11, m12 = matrix.m12;
+        float m20 = matrix.m20, m21 = matrix.m21, m22 = matrix.m22;
 
         float t00 = m22 * m11 - m21 * m12;
         float t10 = m20 * m12 - m22 * m10;
         float t20 = m21 * m10 - m20 * m11;
 
-        float m00 = matrix.m[0][0], m01 = matrix.m[0][1], m02 = matrix.m[0][2];
+        float m00 = matrix.m00, m01 = matrix.m01, m02 = matrix.m02;
 
         float invDet = 1 / (m00 * t00 + m01 * t10 + m02 * t20);
-
+		
         t00 *= invDet; t10 *= invDet; t20 *= invDet;
 
         m00 *= invDet; m01 *= invDet; m02 *= invDet;
-
+		{
         float r00 = t00;
         float r01 = m02 * m21 - m01 * m22;
         float r02 = m01 * m12 - m02 * m11;
@@ -1822,7 +1829,7 @@ mat4_t m4_invert(mat4_t matrix) {
         float r21 = m01 * m20 - m00 * m21;
         float r22 = m00 * m11 - m01 * m10;
 
-        float m03 = matrix.m[0][3], m13 = matrix.m[1][3], m23 = matrix.m[2][3];
+        float m03 = matrix.m03, m13 = matrix.m13, m23 = matrix.m23;
 
         float r03 = - (r00 * m03 + r01 * m13 + r02 * m23);
         float r13 = - (r10 * m03 + r11 * m13 + r12 * m23);
@@ -1833,7 +1840,7 @@ mat4_t m4_invert(mat4_t matrix) {
             r10, r11, r12, r13,
             r20, r21, r22, r23,
               0,   0,   0,   1);
-
+		}
 	/*// Create shorthands to access matrix members
 	float m00 = matrix.m00,  m10 = matrix.m10,  m20 = matrix.m20,  m30 = matrix.m30;
 	float m01 = matrix.m01,  m11 = matrix.m11,  m21 = matrix.m21,  m31 = matrix.m31;
@@ -1851,7 +1858,7 @@ mat4_t m4_invert(mat4_t matrix) {
 		// in the cofactor matrix.
 		// Second sign is already minus from the cofactor matrix.
 		float det = m00*c00 + m10*c10 + m20 * c20;
-		if (fabsf(det) < 0.00001)
+		if (fabs(det) < 0.00001)
 			return m4_identity();
 		
 		// Calcuate inverse of R by dividing the transposed cofactor matrix by the
@@ -1869,10 +1876,10 @@ mat4_t m4_invert(mat4_t matrix) {
 	);*/
 	}
 	else {
-        float m00 = matrix.m[0][0], m01 = matrix.m[0][1], m02 = matrix.m[0][2], m03 = matrix.m[0][3];
-        float m10 = matrix.m[1][0], m11 = matrix.m[1][1], m12 = matrix.m[1][2], m13 = matrix.m[1][3];
-        float m20 = matrix.m[2][0], m21 = matrix.m[2][1], m22 = matrix.m[2][2], m23 = matrix.m[2][3];
-        float m30 = matrix.m[3][0], m31 = matrix.m[3][1], m32 = matrix.m[3][2], m33 = matrix.m[3][3];
+        float m00 = matrix.m00, m01 = matrix.m01, m02 = matrix.m02, m03 = matrix.m03;
+        float m10 = matrix.m10, m11 = matrix.m11, m12 = matrix.m12, m13 = matrix.m13;
+        float m20 = matrix.m20, m21 = matrix.m21, m22 = matrix.m22, m23 = matrix.m23;
+        float m30 = matrix.m30, m31 = matrix.m31, m32 = matrix.m32, m33 = matrix.m33;
 
         float v0 = m20 * m31 - m21 * m30;
         float v1 = m20 * m32 - m22 * m30;
@@ -1904,7 +1911,7 @@ mat4_t m4_invert(mat4_t matrix) {
         v3 = m11 * m32 - m12 * m31;
         v4 = m11 * m33 - m13 * m31;
         v5 = m12 * m33 - m13 * m32;
-
+		{
         float d02 = + (v5 * m01 - v4 * m02 + v3 * m03) * invDet;
         float d12 = - (v5 * m00 - v2 * m02 + v1 * m03) * invDet;
         float d22 = + (v4 * m00 - v2 * m01 + v0 * m03) * invDet;
@@ -1916,7 +1923,7 @@ mat4_t m4_invert(mat4_t matrix) {
         v3 = m22 * m11 - m21 * m12;
         v4 = m23 * m11 - m21 * m13;
         v5 = m23 * m12 - m22 * m13;
-
+		{
         float d03 = - (v5 * m01 - v4 * m02 + v3 * m03) * invDet;
         float d13 = + (v5 * m00 - v2 * m02 + v1 * m03) * invDet;
         float d23 = - (v4 * m00 - v2 * m01 + v0 * m03) * invDet;
@@ -1927,6 +1934,8 @@ mat4_t m4_invert(mat4_t matrix) {
             d10, d11, d12, d13,
             d20, d21, d22, d23,
             d30, d31, d32, d33);		
+		}
+		}	
 	}
 
 }
@@ -1941,11 +1950,11 @@ mat4_t m4_invert(mat4_t matrix) {
  */
 vec3_t m4_mul_pos(mat4_t matrix, vec3_t position) {
 	vec3_t result = vec3(
-            position.x*matrix.m[0][0] + position.y*matrix.m[1][0] + position.z*matrix.m[2][0] + matrix.m[3][0],
-            position.x*matrix.m[0][1] + position.y*matrix.m[1][1] + position.z*matrix.m[2][1] + matrix.m[3][1],
-            position.x*matrix.m[0][2] + position.y*matrix.m[1][2] + position.z*matrix.m[2][2] + matrix.m[3][2]);
+            position.x*matrix.m00 + position.y*matrix.m10 + position.z*matrix.m20 + matrix.m30,
+            position.x*matrix.m01 + position.y*matrix.m11 + position.z*matrix.m21 + matrix.m31,
+            position.x*matrix.m02 + position.y*matrix.m12 + position.z*matrix.m22 + matrix.m32);
 
-	float w = position.x*matrix.m[0][3] + position.y*matrix.m[1][3] + position.z*matrix.m[2][3] + matrix.m[3][3];	
+	float w = position.x*matrix.m03 + position.y*matrix.m13 + position.z*matrix.m23 + matrix.m33;	
 	if (w != 0 && w != 1) return vec3(result.x / w, result.y / w, result.z / w);
 	
 	return result;
@@ -1964,11 +1973,11 @@ vec3_t m4_mul_pos(mat4_t matrix, vec3_t position) {
  */
 vec3_t m4_mul_dir(mat4_t matrix, vec3_t direction) {
 	vec3_t result = vec3(
-            direction.x*matrix.m[0][0] + direction.y*matrix.m[1][0] + direction.z*matrix.m[2][0],
-            direction.x*matrix.m[0][1] + direction.y*matrix.m[1][1] + direction.z*matrix.m[2][1],
-            direction.x*matrix.m[0][2] + direction.y*matrix.m[1][2] + direction.z*matrix.m[2][2]);
+            direction.x*matrix.m00 + direction.y*matrix.m10 + direction.z*matrix.m20,
+            direction.x*matrix.m01 + direction.y*matrix.m11 + direction.z*matrix.m21,
+            direction.x*matrix.m02 + direction.y*matrix.m12 + direction.z*matrix.m22);
 
-	float w = direction.x*matrix.m[0][3] + direction.y*matrix.m[1][3] + direction.z*matrix.m[2][3];	
+	float w = direction.x*matrix.m03 + direction.y*matrix.m13 + direction.z*matrix.m23;	
 	if (w != 0 && w != 1) return vec3(result.x / w, result.y / w, result.z / w);
 	
 	return result;
@@ -1987,8 +1996,8 @@ void m4_fprint(FILE* stream, mat4_t matrix) {
 }
 
 void m4_fprintp(FILE* stream, mat4_t matrix, int width, int precision) {
-	int w = width, p = precision;
-	for(int r = 0; r < 4; r++) {
+	int w = width, p = precision, r;
+	for(r = 0; r < 4; r++) {
 		fprintf(stream, "| %*.*f %*.*f %*.*f %*.*f |\n",
 			w, p, matrix.m[0][r], w, p, matrix.m[1][r], w, p, matrix.m[2][r], w, p, matrix.m[3][r]
 		);
@@ -1997,3 +2006,4 @@ void m4_fprintp(FILE* stream, mat4_t matrix, int width, int precision) {
 
 
 #endif // MATH_3D_IMPLEMENTATION
+

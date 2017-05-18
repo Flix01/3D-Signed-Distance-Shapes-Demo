@@ -58,6 +58,12 @@ reps/
 **/*.sh
 main
 3D_Signed_Distance_Shapes_Demo
+3D_Signed_Distance_Shapes_Demo.exe
+freeglut.dll
+glut.dll
+glut32.dll
+html/
+
 
 
 

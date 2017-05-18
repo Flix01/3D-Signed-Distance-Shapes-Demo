@@ -1,3 +1,6 @@
+#ifdef GL_ES
+precision mediump float;
+#endif
 //#version 120
 // The MIT License
 // Copyright © 2013 Inigo Quilez
