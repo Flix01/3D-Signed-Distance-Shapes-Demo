@@ -74,7 +74,7 @@ Modified by Flix01. Added some structs and functions mostly ported from
 the OgreMath library (www.ogre3d.org) - MIT licensed.
 Very little testing has been done. Use it at your own risk.
 
-Ported code back to C89
+Ported code back to --std=gnu89 [Basically ansi C with single line comments allowed]
 **/
 
 #ifndef MATH_3D_HEADER

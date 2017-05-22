@@ -19,7 +19,8 @@ precision mediump float;
 
 #ifdef USE_CUSTOM_SETTINGS
 #define AMBIENT_OCCLUSION_PRECISION 0
-#define SOFT_SHADOW_ITERATIONS	  	6
+#define SHADOW_ITERATIONS	  		6		// 0 = No shadows
+#define SHADOW_HARDNESS				(5.0)
 #define RAYCAST_ITERATIONS			28
 #define RAYCAST_PRECISION 			(0.001)	// Bigger is a bit faster, but produces artifacts
 //#define RAYCAST_OVER_RELAXED		// Use it at your own risk! NOT IN THE ORIGINAL CODE (and does not improve FPS much)! 
@@ -30,14 +31,16 @@ precision mediump float;
 #define ENABLE_FRE_LIGHTING_COMPONENT 1	
 #define REDUCE_NUM_OBJECTS 1
 
-#define USE_UNIFORM_CAMERA_MATRIX	// Mandatory for input camera mode
+#define USE_UNIFORM_CAMERA_MATRIX	// Mandatory for input camera mode		(arrows keys + pageup/pagedown)
+#define USE_UNIFORM_LIGHT_DIRECTION	// Mandatory for input light direction	(arrows keys + shift)
 
 #define AA 1   // make this 1 is your machine is too slow
 
 #else //USE_CUSTOM_SETTINGS
 // DEFAULT VALUES:
 #define AMBIENT_OCCLUSION_PRECISION 5
-#define SOFT_SHADOW_ITERATIONS	  	16
+#define SHADOW_ITERATIONS	  		16
+#define SHADOW_HARDNESS				(8.0)
 #define RAYCAST_ITERATIONS			64
 #define RAYCAST_PRECISION 			(0.0005)
 
@@ -47,6 +50,7 @@ precision mediump float;
 #define ENABLE_FRE_LIGHTING_COMPONENT 1	
 #define REDUCE_NUM_OBJECTS 			  0
 
+//#define USE_UNIFORM_LIGHT_DIRECTION	// Mandatory for input light direction (arrows keys + shift)
 
 #define AA 1   // make this 1 is your machine is too slow
 #endif //USE_CUSTOM_SETTINGS
@@ -55,8 +59,10 @@ uniform vec2      iResolution;           // viewport resolution (in pixels)
 uniform float     iGlobalTime;           // shader playback time (in seconds)
 #ifdef USE_UNIFORM_CAMERA_MATRIX
 uniform mat4	  iCameraMatrix;
-#endif //USE_UNIFORM_CAMERA_MATRIX
-
+#endif
+#ifdef USE_UNIFORM_LIGHT_DIRECTION
+uniform vec3	  iLightDirection;
+#endif 
 
 mat3 mat3_cast(mat4 m4) {
 	mat3 m;
@@ -84,7 +90,8 @@ float sdPlane( vec3 p )
 
 float sdSphere( vec3 p, float s )
 {
-    return length(p)-s;
+	return length(p)-s;							// correct
+	//return (p.x*p.x+p.y*p.y+p.z*p.z-s*s);    	// @Flix: this should be faster, but it returns a squared distance.... Looks OK to me... (I wonder if by always using squared distance fields we can get a better FPS: we can always use a single sqrt on the min or max returned value if we like (even if mix and other stuff won't be correct))
 }
 
 float sdBox( vec3 p, vec3 b )
@@ -386,10 +393,10 @@ float softshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
 {
 	float res = 1.0;
     float t = mint;
-    for( int i=0; i<SOFT_SHADOW_ITERATIONS; i++ )
+    for( int i=0; i<SHADOW_ITERATIONS; i++ )
     {
 		float h = map( ro + rd*t ).x;
-        res = min( res, 8.0*h/t );
+        res = min( res, SHADOW_HARDNESS*h/t );
         t += clamp( h, 0.02, 0.10 );
         if( h<0.001 || t>tmax ) break;
     }
@@ -445,16 +452,25 @@ vec3 render( in vec3 ro, in vec3 rd )
 		// material        
 		col = 0.45 + 0.35*sin( vec3(0.05,0.08,0.10)*(m-1.0) );
 		// checker:
-        if( m<1.5 )	{            
+	    if( m<1.5 )	
+		{   // checker on ground plane         
             float f = mod( floor(5.0*pos.z) + floor(5.0*pos.x), 2.0);
             col = 0.3 + 0.1*f*vec3(1.0);
         }
+		/*else {	// checker on all objects
+			float f = mod( floor(10.0*pos.x) + floor(10.0*pos.y) + floor(10.0*pos.z), 2.0);
+			col = mix(col,0.3 + 0.1*f*vec3(1.0),0.5);		
+		}*/
         // lighitng        
         float occ = 1.0;
 #		if AMBIENT_OCCLUSION_PRECISION>0
 		occ = calcAO( pos, nor );
 #		endif
+#		ifndef USE_UNIFORM_LIGHT_DIRECTION
 		vec3  lig = normalize( vec3(-0.4, 0.7, -0.6) );
+#		else
+		vec3 lig = iLightDirection;
+#		endif
 		float amb = clamp( 0.5+0.5*nor.y, 0.0, 1.0 );
         float dif = clamp( dot( nor, lig ), 0.0, 1.0 );
 #if 	ENABLE_BAC_LIGHTING_COMPONENT>0
@@ -470,7 +486,7 @@ vec3 render( in vec3 ro, in vec3 rd )
 		float spe = pow(clamp( dot( ref, lig ), 0.0, 1.0 ),16.0);
 #		endif
 
-#if 	SOFT_SHADOW_ITERATIONS>0        
+#if 	SHADOW_ITERATIONS>0        
         dif *= softshadow( pos, lig, 0.02, 2.5 );
 #if 	ENABLE_DOM_LIGHTING_COMPONENT>0
         dom *= softshadow( pos, ref, 0.02, 2.5 );
