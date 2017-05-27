@@ -1,5 +1,10 @@
 //#define USE_GLEW
 //#define NO_FIXED_FUNCTION_PIPELINE
+//#define WRITE_DEPTH_VALUE		// This needs to be defined in "signed_distance_shapes.glsl" as well to make it active.
+                                // (the idea was to mix glutSolidTeapot() with the raytrace output),
+                                // but I'm not smart enough to do it (I'm not able to write the correct depth value inside "signed_distance_shapes.glsl")
+                                // so please keep this definition commented out)
+
 
 #ifdef __EMSCRIPTEN__
 #	undef USE_GLEW
@@ -29,6 +34,7 @@
 #	endif //__FREEGLUT_STD_H__
 #endif // _WIN32
 
+
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
@@ -37,13 +43,11 @@
 #include "math_3d.h"
 #undef MATH_3D_IMPLEMENTATION
 
-
-// Expressed as float so division returns a float and not 0 (640/480 != 640.0/480.0).
-//#define RENDER_WIDTH 1024.0 //640.0
-//#define RENDER_HEIGHT 512.0 //480.0
-//#define FULLSCREEN_RENDER_WIDTH 0  //640.0
-//#define FULLSCREEN_RENDER_HEIGHT 0 //480.0
-
+#ifdef WRITE_DEPTH_VALUE
+#define TEAPOT_IMPLEMENTATION
+#include "teapot.h"
+#undef TEAPOT_IMPLEMENTATION
+#endif //WRITE_DEPTH_VALUE
 
 const char* ConfigFileName = "3D_Signed_Distance_Shapes_demo.ini";
 typedef struct {
@@ -56,7 +60,7 @@ typedef struct {
 } Config;
 void Config_Init(Config* c) {
     c->fullscreen_width=c->fullscreen_height=0;
-    c->windowed_width=720;c->windowed_height=405;
+    c->windowed_width=960;c->windowed_height=540;
     c->fullscreen_enabled=0;
     c->dynamic_resolution_enabled=1;
     c->dynamic_resolution_target_fps=35;
@@ -137,7 +141,7 @@ int windowId = 0; 			// window Id when not in fullscreen mode
 int gameModeWindowId = 0;	// window Id when in fullscreen mode
 
 
-mat4_t pMatrix;				// currently not used (the fragment shader calculates it)
+mat4_t pMatrix,vMatrix;
 mat4_t cameraMatrix,cameraMatrixSlerp;
 float cameraMatrixSlerpTimer = 1.f;
 float cameraMatrixSlerpTimerSpeed = 1.f;
@@ -145,7 +149,7 @@ vec3_t cameraTarget;
 float minCameraTargetDistance =  2.f;
 float maxCameraTargetDistance = 50.f;
 vec3_t light_direction;
-unsigned FPS = 35;
+unsigned FPS = 60;
 
 const char ScreenQuadVS[] = 
         "#ifdef GL_ES\n"\
@@ -169,11 +173,8 @@ const char ScreenQuadFS[] =
         "void main() {\n"\
         "	 vec2 texCoords = (gl_FragCoord.xy/screenResAndFactor.xy)*screenResAndFactor.z;\n"\
         "    gl_FragColor = texture2D( s_diffuse, texCoords);\n"\
-        "    //gl_FragColor = texture2D( s_diffuse, v_texcoord.st );\n"\
-        "    //gl_FragColor = vec4(1.0,0.0,0.0,1.0);\n"\
-        "    //vec2 fragCoord = vec2(gl_FragCoord.x/640.0,gl_FragCoord.y/480.0);\n"\
-        "    //gl_FragColor = vec4(fragCoord.x,fragCoord.y,0.0,1.0);\n"\
         "}\n";
+
 
 
 GLuint getTextFromFile(char* buffer,int buffer_size,const char* filename);
@@ -228,11 +229,6 @@ void RenderTarget_Destroy(RenderTarget* rt) {
 }
 void RenderTarget_Init(RenderTarget* rt,int width, int height) {
     int i;
-    /*
-    In terms of performance, each time you bind, the driver needs to validate the state which costs CPU time.
-    It has been found that you get a speed boost if your textures is the same size and you use 1 FBO for them.
-    If you have 10 textures that are 64x64 and 10 textures that are 512x64, make 2 FBOs. One FBO for each group.
-    */
     //glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     if (rt->screenQuadProgramId==0) return;
 
@@ -257,13 +253,16 @@ void RenderTarget_Init(RenderTarget* rt,int width, int height) {
         //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, rt->width, rt->height, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, 0);	// This seems what my NVIDIA card seems to support natively
 #	endif
 
-        //glBindRenderbuffer(GL_RENDERBUFFER, rt->depth_buffer[i]);
-        //glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, rt->width, rt->height);	// GL_DEPTH_COMPONENT or GL_DEPTH_COMPONENT16
+#   ifdef WRITE_DEPTH_VALUE
+        glBindRenderbuffer(GL_RENDERBUFFER, rt->depth_buffer[i]);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, rt->width, rt->height);	// GL_DEPTH_COMPONENT or GL_DEPTH_COMPONENT16
+#   endif //WRITE_DEPTH_VALUE
 
         glBindFramebuffer(GL_FRAMEBUFFER, rt->frame_buffer[i]);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, rt->texture[i], 0);
-        //glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rt->depth_buffer[i]);
-
+#   ifdef WRITE_DEPTH_VALUE
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rt->depth_buffer[i]);
+#   endif //WRITE_DEPTH_VALUE
         {
             //Does the GPU support current FBO configuration?
             GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -285,6 +284,7 @@ typedef struct {
     GLint uLoc_iGlobalTime;
 
     GLint uLoc_iCameraMatrix;
+    GLint uLoc_iProjectionData;
     GLint uLoc_iLightDirection;
 } MyShaderStuff;
 void MyShaderStuff_Create(MyShaderStuff* p) {
@@ -302,10 +302,17 @@ void MyShaderStuff_Create(MyShaderStuff* p) {
     p->uLoc_iResolution = glGetUniformLocation(p->programId,"iResolution");
     p->uLoc_iGlobalTime = glGetUniformLocation(p->programId,"iGlobalTime");
     p->uLoc_iCameraMatrix = glGetUniformLocation(p->programId,"iCameraMatrix");
+    p->uLoc_iProjectionData = glGetUniformLocation(p->programId,"iProjectionData");
     p->uLoc_iLightDirection = glGetUniformLocation(p->programId,"iLightDirection");
 
 }
 void MyShaderStuff_Destroy(MyShaderStuff* p) {if (p->programId) glDeleteProgram(p->programId);p->programId=0;}
+void MyShaderStuff_SetProjectionUniforms(MyShaderStuff* p,float nearPlane,float farPlane,float degFov,float aspectRatio) {
+    if (p==NULL || p->programId==0) return;
+    glUseProgram(p->programId);
+    glUniform4f(p->uLoc_iProjectionData,nearPlane,farPlane,tan(degFov*M_PIOVER180*0.5f),aspectRatio);
+    glUseProgram(0);
+}
 void MyShaderStuff_SetUniforms(MyShaderStuff* p,int resX,int resY,float globalTime,const mat4_t* m,const vec3_t* lig_dir) {
     if (p==NULL) return;
     glUniform2f(p->uLoc_iResolution,resX,resY);
@@ -479,8 +486,10 @@ GLuint loadShaderProgramFromFile(const char* vspath,const char* fspath) {
 
 void ResizeGL(int w,int h) {
     if (h>0)	{
-        pMatrix =  //m4_ortho(-10.f, 10.f, -5.f, 5.f, 0.1f, 20.f);
-                m4_perspective  (60.f, (float)w/(float)h,0.1f, 500.f);
+        float degFov = 45.f, nearPlane= 0.075f,farPlane = 20.f;
+        pMatrix =  m4_perspective  (degFov, (float)w/(float)h,nearPlane,farPlane);
+        // Warning when using inside DrawGL(): this method binds and unbinds a shader program (unlike the other similiar one)
+        MyShaderStuff_SetProjectionUniforms(&progParams,nearPlane,farPlane,degFov,(float)w/(float)h);
     }
 
     if (h>0) RenderTarget_Init(&render_target,w,h);
@@ -501,6 +510,11 @@ void InitGL(void) {
     MyShaderStuff_Create(&progParams);
     RenderTarget_Create(&render_target);
     ScreenQuadVBO_Init();
+
+#   ifdef WRITE_DEPTH_VALUE
+    Teapot_Init();
+#   endif //WRITE_DEPTH_VALUE
+
     // This is important, if not here, FBO's depthbuffer won't be populated.
     //glEnable(GL_DEPTH_TEST);
     glClearColor(0,0,0,1.0f);
@@ -514,6 +528,9 @@ void InitGL(void) {
 }
 
 void DestroyGL() {
+#   ifdef WRITE_DEPTH_VALUE
+    Teapot_Destroy();
+#   endif //WRITE_DEPTH_VALUE
     ScreenQuadVBO_Destroy();
     RenderTarget_Destroy(&render_target);
     MyShaderStuff_Destroy(&progParams);
@@ -525,6 +542,8 @@ void DrawGlutText(int x, int y, char *string);
 
 void DrawGL(void) 
 {	
+    mat4_t mvMatrix,mvpMatrix;
+    vec3_t lightDirectionInViewSpace;
     static char tmp[64] = "";
     static float resolution_factor = 1.0f;
     static int frame = 0;
@@ -541,9 +560,17 @@ void DrawGL(void)
     delta_time = elapsed_time - cur_time;
     cur_time = elapsed_time;
 
-    // camera stuff
-    //mvMatrix = //m4_invert_fast(m4_invert_XZ_axis(&cameraMatrix));	// correct to mimic m4_look_at(...)
-    //cameraMatrix;
+
+#   ifdef WRITE_DEPTH_VALUE
+    // The modelview matrix is the inverse of the camera matrix
+    // m4_invert_fast(...) can be used only if no scaling is applied and the mat3 submatrix can be expressed as a unit quaternion
+    vMatrix = m4_invert_fast(
+                m4_invert_XZ_axis(&cameraMatrix))   // This is necessary to invert the camera convention so that we can use for all objects (camera included): +X = left, +Y = up, +Z = forward
+                ;
+    lightDirectionInViewSpace = v3_norm(m4_mul_dir(cameraMatrix,light_direction));  // TODO: double check it
+    Teapot_SetLightDirection(v3_cvalue_ptr(&lightDirectionInViewSpace));
+#   endif //WRITE_DEPTH_VALUE
+
 
     if (cameraMatrixSlerpTimer<1.f)	{
         if (cameraMatrixSlerpTimerBegin==0) cameraMatrixSlerpTimerBegin = glutGet(GLUT_ELAPSED_TIME);
@@ -573,10 +600,40 @@ void DrawGL(void)
                               render_target.height * (config.dynamic_resolution_enabled ? resolution_factor : 1.0f),
                               (float)elapsed_time/1000.f,
                               &cameraMatrix,
+                              //&vMatrix,
                               &light_direction
                               );
-    ScreenQuadVBO_Draw();
+#   ifdef WRITE_DEPTH_VALUE
+    glDisable(GL_DEPTH_TEST); // No depth test = no hidden pixels
+    glDepthMask(GL_TRUE);     // Write depth value of pixels
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Mandatory (at least GL_DEPTH_BUFFER_BIT)
+#   endif //WRITE_DEPTH_VALUE
+
+    ScreenQuadVBO_Draw();    // Draw the spherecast scene
     //glUseProgram(0);
+
+
+#   ifdef WRITE_DEPTH_VALUE
+    ScreenQuadVBO_Unbind();
+    glEnable(GL_DEPTH_TEST); // depth test on = hide pixels if behind other stuff
+    glDepthMask(GL_TRUE);    // Write depth values of teapot
+    glEnable(GL_CULL_FACE);  // Don't draw back faces of teapot
+    {
+    mat4_t mMatrix = m4_translation(vec3(1.0,0.1,3.0));
+    mvMatrix = m4_mul(vMatrix,mMatrix);
+    mvpMatrix = m4_mul(pMatrix,mvMatrix);
+    Teapot_PreDraw();
+    Teapot_SetColor(1.f,1.f,0.f,1.0f);
+    Teapot_SetScaling(0.5f,0.5f,0.5f);
+    Teapot_Draw(m4_cvalue_ptr(&mvMatrix),m4_cvalue_ptr(&mvpMatrix));
+    Teapot_PostDraw();
+    }
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glDepthMask(GL_FALSE);
+    ScreenQuadVBO_Bind();
+#   endif //WRITE_DEPTH_VALUE
+
 
     if (config.dynamic_resolution_enabled)
         glBindFramebuffer(GL_FRAMEBUFFER,render_target.default_frame_buffer);
@@ -620,14 +677,18 @@ void DrawGL(void)
         FPS = delta_frames*1000/display_fps_time;
         display_fps_time = 0;
         delta_frames = 0;
-        if (FPS<FPS_TARGET) {
-            resolution_factor-= resolution_factor*(FPS+FPS_TARGET)*0.0175f;
-            if (resolution_factor<0.15f) resolution_factor=0.15f;
+        if (config.dynamic_resolution_enabled)
+        {
+            if (FPS<FPS_TARGET) {
+                resolution_factor-= resolution_factor*(FPS_TARGET-FPS)*0.0175f;
+                if (resolution_factor<0.15f) resolution_factor=0.15f;
+            }
+            else {
+                resolution_factor+= resolution_factor*(FPS-FPS_TARGET)*0.0175f;
+                if (resolution_factor>1.0f) resolution_factor=1.0f;
+            }
         }
-        else {
-            resolution_factor+= resolution_factor*(FPS-FPS_TARGET)*0.0175f;
-            if (resolution_factor>1.0f) resolution_factor=1.0f;
-        }
+        else resolution_factor=1.f;
         sprintf(tmp,"FPS: %u DYN-RES:%s DRF=%1.3f (%dx%d %s)",FPS,config.dynamic_resolution_enabled ? "ON " : "OFF",resolution_factor,render_target.width,render_target.height,windowId ? "windowed" : "fullscreen");
 #		ifdef NO_FIXED_FUNCTION_PIPELINE
         if (config.show_fps)	{
@@ -725,7 +786,7 @@ void MoveCameraAroundTarget(int glut_key,float amount,const mat4_t* cameraIn,mat
     YPR.z=0.f;
 
     if (glut_key==GLUT_KEY_LEFT || glut_key==GLUT_KEY_RIGHT)
-        YPR.x-=(glut_key==GLUT_KEY_RIGHT ? amount : -amount);
+        YPR.x-=(glut_key==GLUT_KEY_RIGHT ? (-amount) : amount);
     else if (glut_key==GLUT_KEY_UP || glut_key==GLUT_KEY_DOWN)	{
         YPR.y-=(glut_key==GLUT_KEY_DOWN ? amount : -amount);
         if      (YPR.y < -M_HALF_PI+0.001f) YPR.y = -M_HALF_PI+0.001f;
@@ -755,8 +816,8 @@ void MoveCameraTarget(int glut_key,float amount,const mat4_t* cameraIn,mat4_t* c
     vec3_t cameraPos = m4_get_translation(cameraIn);
     vec3_t deltaTarget = vec3(0,0,0);
     if (cameraOut!=cameraIn) *cameraOut=*cameraIn;
-    if 		(glut_key==GLUT_KEY_LEFT) 		deltaTarget.x-=amount;
-    else if (glut_key==GLUT_KEY_RIGHT)		deltaTarget.x+=amount;
+    if 		(glut_key==GLUT_KEY_LEFT) 		deltaTarget.x+=amount;
+    else if (glut_key==GLUT_KEY_RIGHT)		deltaTarget.x-=amount;
     else if	(glut_key==GLUT_KEY_UP) 		deltaTarget.z+=amount;
     else if (glut_key==GLUT_KEY_DOWN)		deltaTarget.z-=amount;
     deltaTarget = m4_mul_dir(*cameraIn,deltaTarget);	// Optional, to move not in worls space
@@ -815,7 +876,7 @@ void GlutSpecialKeys(int key,int x,int y)
         case GLUT_KEY_F2:
         {
             config.show_fps = !config.show_fps;
-#           ifndef __EMSCRIPTEN
+#           ifndef NO_FIXED_FUNCTION_PIPELINE
             printf("showFPS: %s.\n",config.show_fps?"ON":"OFF");
 #           endif
         }
@@ -918,9 +979,11 @@ void GlutCreateWindow() {
     glutIdleFunc(GlutIdle);
     glutReshapeFunc(ResizeGL);
     glutDisplayFunc(GlutFakeDrawGL);
+#   ifdef __FREEGLUT_STD_H__
 #   ifndef __EMSCRIPTEN__
     glutWMCloseFunc(GlutCloseWindow);
 #   endif //__EMSCRIPTEN__
+#   endif //__FREEGLUT_STD_H__
 
 #ifdef USE_GLEW
     {

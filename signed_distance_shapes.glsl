@@ -1,21 +1,21 @@
-#ifdef GL_ES
-precision mediump float;
-#endif
 //#version 120
 // The MIT License
 // Copyright © 2013 Inigo Quilez
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-    
 
-// A list of useful distance function to simple primitives, and an example on how to 
+
+// A list of useful distance function to simple primitives, and an example on how to
 // do some interesting boolean operations, repetition and displacement.
 //
 // More info here: http://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
 
 // Sligthly modified by Flix01 to accept a camera matrix and to tune
 // behaviour with the following definitions:
+#ifdef GL_ES
+precision mediump float;
+#endif
 
-#define USE_CUSTOM_SETTINGS
+#define USE_CUSTOM_SETTINGS // Comment this out for the original code by Inigo Quilez (= good stuff)
 
 #ifdef USE_CUSTOM_SETTINGS
 #define AMBIENT_OCCLUSION_PRECISION 0
@@ -24,6 +24,7 @@ precision mediump float;
 #define RAYCAST_ITERATIONS			28
 #define RAYCAST_PRECISION 			(0.001)	// Bigger is a bit faster, but produces artifacts
 //#define RAYCAST_OVER_RELAXED		// Use it at your own risk! NOT IN THE ORIGINAL CODE (and does not improve FPS much)! 
+//#define GAMMA_CORRECTION_USING_SQRT	// col = pow(col,vec3(0.4545)); is replaced by col = sqrt(col); // which is pow(col,vec3(0.5)); AFAIK
 
 #define ENABLE_SPE_LIGHTING_COMPONENT 0
 #define ENABLE_DOM_LIGHTING_COMPONENT 0	
@@ -33,6 +34,7 @@ precision mediump float;
 
 #define USE_UNIFORM_CAMERA_MATRIX	// Mandatory for input camera mode		(arrows keys + pageup/pagedown)
 #define USE_UNIFORM_LIGHT_DIRECTION	// Mandatory for input light direction	(arrows keys + shift)
+//#define WRITE_DEPTH_VALUE		// EXPERIMENTAL & WIP & NON-WORKING: This must be present in main.c too (needs USE_UNIFORM_CAMERA_MATRIX too)
 
 #define AA 1   // make this 1 is your machine is too slow
 
@@ -55,10 +57,16 @@ precision mediump float;
 #define AA 1   // make this 1 is your machine is too slow
 #endif //USE_CUSTOM_SETTINGS
 
+
+#ifndef USE_UNIFORM_CAMERA_MATRIX
+#undef WRITE_DEPTH_VALUE
+#endif //USE_UNIFORM_CAMERA_MATRIX
+
 uniform vec2      iResolution;           // viewport resolution (in pixels)
 uniform float     iGlobalTime;           // shader playback time (in seconds)
 #ifdef USE_UNIFORM_CAMERA_MATRIX
 uniform mat4	  iCameraMatrix;
+uniform vec4      iProjectionData;	 // .x = near plane .y = far plane .z = tan(fov*0.5) w = aspect ratio = iResolution.x/iResolution.y
 #endif
 #ifdef USE_UNIFORM_LIGHT_DIRECTION
 uniform vec3	  iLightDirection;
@@ -242,13 +250,23 @@ vec3 opTwist( vec3 p )
     return vec3(m*p.xz,p.y);
 }
 
+
+float opMix(vec3 p, float d1, float d2) {
+    // @Flix From: "Rendering Worlds with Two Triangles with raytracing on the GPU" by Iñigo Quilez
+    float bfact = smoothstep( length(p), 0.0, 1.0 );
+    return mix( d1, d2, bfact );
+}
+
+
 //------------------------------------------------------------------
 
 vec2 map( in vec3 pos )
 {
+    float sinValue = 0.0;//sin(iGlobalTime);
+
     vec2 res = opU( vec2( sdPlane(     pos), 1.0 ),
-	                vec2( sdSphere(    pos-vec3( 0.0,0.25, 0.0), 0.25 ), 46.9 ) );
-    res = opU( res, vec2( sdBox(       pos-vec3( 1.0,0.25, 0.0), vec3(0.25) ), 3.0 ) );
+			vec2( sdSphere(    pos-vec3( 0.0,0.25, 0.0), 0.25 ), 46.9 ) );
+    res = opU( res, vec2( sdBox(       pos-vec3( 1.0,0.25, 0.0+(0.5*sinValue)), vec3(0.25) ), 3.0 ) );
     res = opU( res, vec2( udRoundBox(  pos-vec3( 1.0,0.25, 1.0), vec3(0.15), 0.1 ), 41.0 ) );
 	res = opU( res, vec2( sdTorus(     pos-vec3( 0.0,0.25, 1.0), vec2(0.20,0.05) ), 25.0 ) );
     res = opU( res, vec2( sdCapsule(   pos,vec3(-1.3,0.10,-0.1), vec3(-0.8,0.50,0.2), 0.1  ), 31.9 ) );
@@ -270,15 +288,22 @@ vec2 map( in vec3 pos )
 #	endif	
     res = opU( res, vec2( sdConeSection( pos-vec3( 0.0,0.35,-2.0), 0.15, 0.2, 0.1 ), 13.67 ) );
     res = opU( res, vec2( sdEllipsoid( pos-vec3( 1.0,0.35,-2.0), vec3(0.15, 0.2, 0.05) ), 43.17 ) );
+
+    //res = opU( res, vec2(opMix(pos,sdSphere(pos-vec3(0.0,0.25,3.0),0.25+(0.25*sinValue)), sdBox(  pos-vec3( 0.0,0.25, 3.0), vec3(0.125-(0.125*sinValue)))), 43.17 ) );
         
     return res;
 }
 
 vec2 castRay( in vec3 ro, in vec3 rd )
 {
+#ifndef USE_UNIFORM_CAMERA_MATRIX
     float tmin = 1.0;
     float tmax = 20.0;
-   
+#else
+    float tmin = iProjectionData.x;
+    float tmax = iProjectionData.y;
+#endif
+
 #if 1
     // bounding volume
     float tp1 = (0.0-ro.y)/rd.y; if( tp1>0.0 ) tmax = min( tmax, tp1 );
@@ -291,11 +316,11 @@ vec2 castRay( in vec3 ro, in vec3 rd )
     float m = -1.0;
     for( int i=0; i<RAYCAST_ITERATIONS; i++ )
     {
-	    float precis = RAYCAST_PRECISION*t;
-	    vec2 res = map( ro+rd*t );
-        if( res.x<precis || t>tmax ) break;
-        t += res.x;
-	    m = res.y;
+	float precis = RAYCAST_PRECISION*t;
+	vec2 res = map( ro+rd*t );
+	if( res.x<precis || t>tmax ) break;
+	t += res.x;
+	m = res.y;
     }
 
     if( t>tmax ) m=-1.0;
@@ -311,20 +336,20 @@ vec2 castRay( in vec3 ro, in vec3 rd )
 	float stepLength = 0.0;
 	float functionSign = map(ro).x < 0.0 ? -1.0 : +1.0;
 	for (int i = 0; i < RAYCAST_ITERATIONS; ++i) {
-		float precis = RAYCAST_PRECISION*t;
-		vec2 res = map( ro+rd*t );
-		float signedRadius = functionSign * res.x;
-		float radius = abs(signedRadius);
-		bool sorFail = omega > 1.0 && (radius + previousRadius) < stepLength;
-		if (sorFail) {
-			stepLength -= omega * stepLength;
-			omega = 1.0;	
-		} else {
-			stepLength = signedRadius * omega;
-		}
-		previousRadius = radius;
-		if(!sorFail && (res.x<precis || t>tmax)) break;
-        t += stepLength;
+	    float precis = RAYCAST_PRECISION*t;
+	    vec2 res = map( ro+rd*t );
+	    float signedRadius = functionSign * res.x;
+	    float radius = abs(signedRadius);
+	    bool sorFail = omega > 1.0 && (radius + previousRadius) < stepLength;
+	    if (sorFail) {
+		stepLength -= omega * stepLength;
+		omega = 1.0;
+	    } else {
+		stepLength = signedRadius * omega;
+	    }
+	    previousRadius = radius;
+	    if(!sorFail && (res.x<precis || t>tmax)) break;
+	    t += stepLength;
 	    m = res.y;
 	}
 	if (t>tmax) m=-1.0;
@@ -440,7 +465,7 @@ vec3 render( in vec3 ro, in vec3 rd )
     vec3 col = vec3(0.7, 0.9, 1.0) +rd.y*0.8;
     vec2 res = castRay(ro,rd);
     float t = res.x;
-	float m = res.y;
+    float m = res.y;
     if( m>-0.5 )
     {
         vec3 pos = ro + t*rd;
@@ -512,7 +537,40 @@ vec3 render( in vec3 ro, in vec3 rd )
 
     	col = mix( col, vec3(0.8,0.9,1.0), 1.0-exp( -0.0002*t*t*t ) );
     }
+#   ifdef WRITE_DEPTH_VALUE
+    gl_FragDepth = t;	// Please note that I got no idea whether or not 't' can be used as depth value as it is... probably not! :(
+    //gl_FragDepth = (t - iProjectionData.x)/(iProjectionData.y - iProjectionData.x);			// Linear
+    //gl_FragDepth = (1.0/t - 1.0/iProjectionData.x)/(1.0/iProjectionData.y - 1.0/iProjectionData.x);
+    /*float far=gl_DepthRange.far; float near=gl_DepthRange.near;
+    gl_FragDepth = (((far-near) * t) + near + far) / 2.0;*/
 
+    // WELL, NOTHING WORKED! Maybe I have to project rd (does not work)
+    /*vec3 camZ = vec3(iCameraMatrix[2][0],iCameraMatrix[2][1],iCameraMatrix[2][2]);
+    t *= dot(rd,camZ);
+    gl_FragDepth = (1.0/t - 1.0/iProjectionData.x)/(1.0/iProjectionData.y - 1.0/iProjectionData.x);*/
+
+    // NO WAY! gl_FragDepth is simply IGNORED! Try this:
+    //gl_FragDepth = gl_DepthRange.far;
+/*  If depth buffering is enabled and no shader writes to gl_FragDepth, then the fixed function value
+    for depth will be used (this value is contained in the z component of gl_FragCoord) otherwise, the
+    value written to gl_FragDepth is used.
+*/
+/* // Something from the web:
+float far=gl_DepthRange.far; float near=gl_DepthRange.near;
+vec4 eye_space_pos = gl_ModelViewMatrix * something
+vec4 clip_space_pos = gl_ProjectionMatrix * eye_space_pos;
+float ndc_depth = clip_space_pos.z / clip_space_pos.w;
+gl_FragDepth = (((far-near) * ndc_depth) + near + far) / 2.0;
+
+// Or:
+vec4 v_clip_coord = modelview_projection * vec4(v_position, 1.0);
+float f_ndc_depth = v_clip_coord.z / v_clip_coord.w;
+gl_FragDepth = (1.0 - 0.0) * 0.5 * f_ndc_depth + (1.0 + 0.0) * 0.5;
+//Note that in this code, near is 0.0 and far is 1.0, which are the default values of gl_DepthRange.
+//Note that gl_DepthRange is not the same thing as the near/far distance in the formula for perspective projection matrix! The only trick is using the 0.0 and 1.0 (or gl_DepthRange in case you actually need to change it),
+
+*/
+#   endif //WRITE_DEPTH_VALUE
 	return vec3( clamp(col,0.0,1.0) );
 }
 
@@ -529,6 +587,13 @@ mat3 setCamera( in vec3 ro, in vec3 ta, float cr )
 
 void main()
 {
+/*
+    gl_FragCoord is an input variable that contains the window relative coordinate (x, y, z, 1/w) values
+    for the fragment. If multi-sampling, this value can be for any location within the pixel, or one of
+    the fragment samples. This value is the result of fixed functionality that interpolates primitives
+    after vertex processing to generate fragments. The z component is the depth value that would be used
+    for the fragment's depth if no shader contained any writes to gl_FragDepth.
+*/
 	vec2 fragCoord = gl_FragCoord.xy;
 
 #ifndef USE_UNIFORM_CAMERA_MATRIX
@@ -543,38 +608,78 @@ void main()
     {
         // pixel coordinates
         vec2 o = vec2(float(m),float(n)) / float(AA) - 0.5;
+#	ifndef USE_UNIFORM_CAMERA_MATRIX
         vec2 p = (-iResolution.xy + 2.0*(fragCoord+o))/iResolution.y;
-#else    
-        vec2 p = (-iResolution.xy + 2.0*fragCoord)/iResolution.y;
+#	else
+	vec2 p;	// Please see picture below to understand this
+	p.y = (iProjectionData.x * iProjectionData.z);
+	p.x = -p.y * iProjectionData.w;  // @Flix: we use this convention for all objects (camera included): +X = left, +Y = up, +Z = forward: thus X must go left
+	p.xy *= (2.0 * (fragCoord+o) / iResolution.xy - 1.0);	// we multiply per interval [-1,1]
+#	endif
+#else    	
+#	ifndef USE_UNIFORM_CAMERA_MATRIX
+	vec2 p = (-iResolution.xy + 2.0*fragCoord)/iResolution.y;
+#	else
+	vec2 p;	// Please see picture below to understand this
+	p.y = (iProjectionData.x * iProjectionData.z);
+	p.x = -p.y * iProjectionData.w;  // @Flix: we use this convention for all objects (camera included): +X = left, +Y = up, +Z = forward: thus X must go left
+	p.xy *= (2.0 * fragCoord.xy / iResolution.xy - 1.0);	// we multiply per interval [-1,1]
+#	endif
 #endif
 
 #ifndef USE_UNIFORM_CAMERA_MATRIX
-		// camera	
+	// original code here:
+
+	// camera
         vec3 ro = vec3( -0.5+3.5*cos(0.1*time + 6.0*mo.x), 1.0 + 2.0*mo.y, 0.5 + 4.0*sin(0.1*time + 6.0*mo.x) ); // origin
         vec3 ta = vec3( -0.5, -0.4, 0.5 );	// target
         // camera-to-world transformation
-        mat3 ca = setCamera( ro, ta, 0.0 );			// This can be passed as a uniform!
+	mat3 ca = setCamera( ro, ta, 0.0 );
         // ray direction
         vec3 rd = ca * normalize( vec3(p.xy,2.0) );
  		// render	
         vec3 col = render( ro, rd );
 #else 
-//		vec3 ro = vec3(iCameraMatrix[0][3],iCameraMatrix[1][3],iCameraMatrix[2][3]);
-		vec3 ro = vec3(iCameraMatrix[3][0],iCameraMatrix[3][1],iCameraMatrix[3][2]);
-		//vec3 cd = vec3(iCameraMatrix[0][2],iCameraMatrix[1][2],iCameraMatrix[2][2]);
-		//vec3 rd = cd;			
-		//vec3 ro = vec3(iCameraMatrix[0][3],iCameraMatrix[1][3],iCameraMatrix[2][3]);
-		// ray direction
-		mat3 ca = mat3_cast(iCameraMatrix);		
-		vec3 rd = ca * normalize( vec3(p.xy,2.0) );
-	
- 		// render	
+	// @Flix here:
+
+	// ray origin (camera position)
+	vec3 ro = vec3(iCameraMatrix[3][0],iCameraMatrix[3][1],iCameraMatrix[3][2]);
+
+	/* NEAR PLANE FROM CAMERA VIEW:
+
+		   H
+	   |-------|--------|		H = nearPlane * tan(halfFov);	// half height
+	   |	   |        |
+	   |      O|--------|W
+	   |                |
+	   |----------------|		W = H * aspectRatio;		// half width
+
+	   iProjectionData.x = nearPlane;
+	   iProjectionData.y = farPlane;
+	   iProjectionData.z = tan(fov*0.5);
+	   iProjectionData.w = aspectRatio;
+
+	   ALL THE STUFF HERE IS IN OPENGL COORDS. BUT FROM ABOVE:
+	   vec2 p = (-iResolution.xy + 2.0*fragCoord)/iResolution.y;   // what's this ???
+	   WE'D LIKE IT TO BE IN (-1,1)
+	*/
+
+	// ray direction
+	mat3 ca = mat3_cast(iCameraMatrix);
+	vec3 rd = ca * normalize( vec3(p.xy,iProjectionData.x));
+
+
+	// render
         vec3 col = render( ro, rd );
 #endif
 
        
-		// gamma
-        col = pow( col, vec3(0.4545) );
+	// gamma
+#	ifndef GAMMA_CORRECTION_USING_SQRT
+	col = pow( col, vec3(0.4545) );
+#	else
+	col = sqrt(col);    // = pow(col,vec3(0.5)); but it's probably faster than the line above
+#	endif
 
         tot += col;
 #if AA>1
