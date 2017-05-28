@@ -2,14 +2,16 @@
 //#define NO_FIXED_FUNCTION_PIPELINE
 //#define WRITE_DEPTH_VALUE		// This needs to be defined in "signed_distance_shapes.glsl" as well to make it active.
                                 // (the idea was to mix glutSolidTeapot() with the raytrace output),
-                                // but I'm not smart enough to do it (I'm not able to write the correct depth value inside "signed_distance_shapes.glsl")
-                                // so please keep this definition commented out)
+#define NUM_RENDER_TARGETS (3)	// Must be >0   // if >1 creates an update lag (but should be faster)
 
 
 #ifdef __EMSCRIPTEN__
 #	undef USE_GLEW
 #	undef NO_FIXED_FUNCTION_PIPELINE
 #	define NO_FIXED_FUNCTION_PIPELINE
+#   ifdef WRITE_DEPTH_VALUE
+#   error WRITE_DEPTH_VALUE in emscripten produces a wrong FBO (no depth render buffer support in WebGL 1)
+#   endif //WRITE_DEPTH_VALUE
 #endif //__EMSCRIPTEN__
 
 #ifdef _WIN32
@@ -179,8 +181,6 @@ const char ScreenQuadFS[] =
 
 GLuint getTextFromFile(char* buffer,int buffer_size,const char* filename);
 GLuint loadShaderProgramFromSource(const char* vs,const char* fs);
-
-#define NUM_RENDER_TARGETS (3)	// Must be >0
 
 typedef struct {
     GLuint frame_buffer[NUM_RENDER_TARGETS];
@@ -604,8 +604,9 @@ void DrawGL(void)
                               &light_direction
                               );
 #   ifdef WRITE_DEPTH_VALUE
-    glDisable(GL_DEPTH_TEST); // No depth test = no hidden pixels
-    glDepthMask(GL_TRUE);     // Write depth value of pixels
+    glEnable(GL_DEPTH_TEST);    // For some odd reasons gl_FragDepth (in shader) seems to work only with GL_DEPTH_TEST enabled
+    glDepthFunc(GL_ALWAYS);     // Always pass GL_DEPTH_TEST
+    glDepthMask(GL_TRUE);       // Write depth value of pixels
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Mandatory (at least GL_DEPTH_BUFFER_BIT)
 #   endif //WRITE_DEPTH_VALUE
 
@@ -616,16 +617,30 @@ void DrawGL(void)
 #   ifdef WRITE_DEPTH_VALUE
     ScreenQuadVBO_Unbind();
     glEnable(GL_DEPTH_TEST); // depth test on = hide pixels if behind other stuff
+    glDepthFunc(GL_LESS);    // default value
     glDepthMask(GL_TRUE);    // Write depth values of teapot
     glEnable(GL_CULL_FACE);  // Don't draw back faces of teapot
     {
+    Teapot_PreDraw();
+
+    Teapot_SetScaling(0.5f,0.5f,0.5f);
+
+    // First teapot
     mat4_t mMatrix = m4_translation(vec3(1.0,0.1,3.0));
     mvMatrix = m4_mul(vMatrix,mMatrix);
     mvpMatrix = m4_mul(pMatrix,mvMatrix);
-    Teapot_PreDraw();
+
     Teapot_SetColor(1.f,1.f,0.f,1.0f);
-    Teapot_SetScaling(0.5f,0.5f,0.5f);
     Teapot_Draw(m4_cvalue_ptr(&mvMatrix),m4_cvalue_ptr(&mvpMatrix));
+
+    // second teapot
+    mMatrix = m4_translation(vec3(-1.0,0.1,3.0));
+    mvMatrix = m4_mul(vMatrix,mMatrix);
+    mvpMatrix = m4_mul(pMatrix,mvMatrix);
+
+    Teapot_SetColor(0.5f,0.5f,1.f,1.0f);
+    Teapot_Draw(m4_cvalue_ptr(&mvMatrix),m4_cvalue_ptr(&mvpMatrix));
+
     Teapot_PostDraw();
     }
     glDisable(GL_DEPTH_TEST);

@@ -9,11 +9,12 @@
 //
 // More info here: http://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
 
-// Sligthly modified by Flix01 to accept a camera matrix and to tune
-// behaviour with the following definitions:
 #ifdef GL_ES
 precision mediump float;
 #endif
+
+// Sligthly modified by Flix01 to accept a camera matrix and to tune
+// behaviour with the following definitions:
 
 #define USE_CUSTOM_SETTINGS // Comment this out for the original code by Inigo Quilez (= good stuff)
 
@@ -34,7 +35,7 @@ precision mediump float;
 
 #define USE_UNIFORM_CAMERA_MATRIX	// Mandatory for input camera mode		(arrows keys + pageup/pagedown)
 #define USE_UNIFORM_LIGHT_DIRECTION	// Mandatory for input light direction	(arrows keys + shift)
-//#define WRITE_DEPTH_VALUE		// EXPERIMENTAL & WIP & NON-WORKING: This must be present in main.c too (needs USE_UNIFORM_CAMERA_MATRIX too)
+//#define WRITE_DEPTH_VALUE		// Slow: This must be present in main.c too (needs USE_UNIFORM_CAMERA_MATRIX too)
 
 #define AA 1   // make this 1 is your machine is too slow
 
@@ -52,7 +53,9 @@ precision mediump float;
 #define ENABLE_FRE_LIGHTING_COMPONENT 1	
 #define REDUCE_NUM_OBJECTS 			  0
 
-//#define USE_UNIFORM_LIGHT_DIRECTION	// Mandatory for input light direction (arrows keys + shift)
+//#define USE_UNIFORM_CAMERA_MATRIX	// Mandatory for input camera mode		(arrows keys + pageup/pagedown)
+//#define USE_UNIFORM_LIGHT_DIRECTION	// Mandatory for input light direction	(arrows keys + shift)
+//#define WRITE_DEPTH_VALUE		// Slow: This must be present in main.c too (needs USE_UNIFORM_CAMERA_MATRIX too)
 
 #define AA 1   // make this 1 is your machine is too slow
 #endif //USE_CUSTOM_SETTINGS
@@ -262,7 +265,8 @@ float opMix(vec3 p, float d1, float d2) {
 
 vec2 map( in vec3 pos )
 {
-    float sinValue = 0.0;//sin(iGlobalTime);
+    float sinValue = 0.0;
+	    //sin(iGlobalTime);
 
     vec2 res = opU( vec2( sdPlane(     pos), 1.0 ),
 			vec2( sdSphere(    pos-vec3( 0.0,0.25, 0.0), 0.25 ), 46.9 ) );
@@ -538,38 +542,7 @@ vec3 render( in vec3 ro, in vec3 rd )
     	col = mix( col, vec3(0.8,0.9,1.0), 1.0-exp( -0.0002*t*t*t ) );
     }
 #   ifdef WRITE_DEPTH_VALUE
-    gl_FragDepth = t;	// Please note that I got no idea whether or not 't' can be used as depth value as it is... probably not! :(
-    //gl_FragDepth = (t - iProjectionData.x)/(iProjectionData.y - iProjectionData.x);			// Linear
-    //gl_FragDepth = (1.0/t - 1.0/iProjectionData.x)/(1.0/iProjectionData.y - 1.0/iProjectionData.x);
-    /*float far=gl_DepthRange.far; float near=gl_DepthRange.near;
-    gl_FragDepth = (((far-near) * t) + near + far) / 2.0;*/
-
-    // WELL, NOTHING WORKED! Maybe I have to project rd (does not work)
-    /*vec3 camZ = vec3(iCameraMatrix[2][0],iCameraMatrix[2][1],iCameraMatrix[2][2]);
-    t *= dot(rd,camZ);
-    gl_FragDepth = (1.0/t - 1.0/iProjectionData.x)/(1.0/iProjectionData.y - 1.0/iProjectionData.x);*/
-
-    // NO WAY! gl_FragDepth is simply IGNORED! Try this:
-    //gl_FragDepth = gl_DepthRange.far;
-/*  If depth buffering is enabled and no shader writes to gl_FragDepth, then the fixed function value
-    for depth will be used (this value is contained in the z component of gl_FragCoord) otherwise, the
-    value written to gl_FragDepth is used.
-*/
-/* // Something from the web:
-float far=gl_DepthRange.far; float near=gl_DepthRange.near;
-vec4 eye_space_pos = gl_ModelViewMatrix * something
-vec4 clip_space_pos = gl_ProjectionMatrix * eye_space_pos;
-float ndc_depth = clip_space_pos.z / clip_space_pos.w;
-gl_FragDepth = (((far-near) * ndc_depth) + near + far) / 2.0;
-
-// Or:
-vec4 v_clip_coord = modelview_projection * vec4(v_position, 1.0);
-float f_ndc_depth = v_clip_coord.z / v_clip_coord.w;
-gl_FragDepth = (1.0 - 0.0) * 0.5 * f_ndc_depth + (1.0 + 0.0) * 0.5;
-//Note that in this code, near is 0.0 and far is 1.0, which are the default values of gl_DepthRange.
-//Note that gl_DepthRange is not the same thing as the near/far distance in the formula for perspective projection matrix! The only trick is using the 0.0 and 1.0 (or gl_DepthRange in case you actually need to change it),
-
-*/
+    gl_FragDepth = (1.0/t - 1.0/iProjectionData.x)/(1.0/iProjectionData.y - 1.0/iProjectionData.x);
 #   endif //WRITE_DEPTH_VALUE
 	return vec3( clamp(col,0.0,1.0) );
 }
@@ -687,9 +660,6 @@ void main()
     tot /= float(AA*AA);
 #endif
 
-	//tot.x=1.0;tot.y=0.0;tot.z=0.0;
-	//tot.x = fragCoord.x;tot.y=fragCoord.y,tot.z=0.0;
-	//tot.x=p.x;tot.y=p.y;tot.z=0.0;
     gl_FragColor = vec4( tot, 1.0 );
 }
 
