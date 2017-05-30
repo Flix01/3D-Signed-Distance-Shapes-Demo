@@ -47,6 +47,9 @@
 
 #ifdef WRITE_DEPTH_VALUE
 #define TEAPOT_IMPLEMENTATION
+#define TEAPOT_CENTER_MESHES_ON_FLOOR   // (Optional) Otherwise meshes are centered in their local center
+//#define TEAPOT_INVERT_MESHES_Z_AXIS     // (Optional) Otherwise meshes look in the opposite Z direction
+//#define TEAPOT_SHADER_SPECULAR          // (Optional) specular hilights
 #include "teapot.h"
 #undef TEAPOT_IMPLEMENTATION
 #endif //WRITE_DEPTH_VALUE
@@ -488,8 +491,13 @@ void ResizeGL(int w,int h) {
     if (h>0)	{
         float degFov = 45.f, nearPlane= 0.075f,farPlane = 20.f;
         pMatrix =  m4_perspective  (degFov, (float)w/(float)h,nearPlane,farPlane);
+
         // Warning when using inside DrawGL(): this method binds and unbinds a shader program (unlike the other similiar one)
         MyShaderStuff_SetProjectionUniforms(&progParams,nearPlane,farPlane,degFov,(float)w/(float)h);
+
+#       ifdef WRITE_DEPTH_VALUE
+        Teapot_SetProjectionMatrix(m4_cvalue_ptr(&pMatrix));
+#       endif
     }
 
     if (h>0) RenderTarget_Init(&render_target,w,h);
@@ -542,8 +550,6 @@ void DrawGlutText(int x, int y, char *string);
 
 void DrawGL(void) 
 {	
-    mat4_t mvMatrix,mvpMatrix;
-    vec3_t lightDirectionInViewSpace;
     static char tmp[64] = "";
     static float resolution_factor = 1.0f;
     static int frame = 0;
@@ -567,8 +573,7 @@ void DrawGL(void)
     vMatrix = m4_invert_fast(
                 m4_invert_XZ_axis(&cameraMatrix))   // This is necessary to invert the camera convention so that we can use for all objects (camera included): +X = left, +Y = up, +Z = forward
                 ;
-    lightDirectionInViewSpace = v3_norm(m4_mul_dir(cameraMatrix,light_direction));  // TODO: double check it
-    Teapot_SetLightDirection(v3_cvalue_ptr(&lightDirectionInViewSpace));
+    Teapot_SetViewMatrixAndLightDirection(m4_cvalue_ptr(&vMatrix),v3_cvalue_ptr(&light_direction));
 #   endif //WRITE_DEPTH_VALUE
 
 
@@ -600,7 +605,6 @@ void DrawGL(void)
                               render_target.height * (config.dynamic_resolution_enabled ? resolution_factor : 1.0f),
                               (float)elapsed_time/1000.f,
                               &cameraMatrix,
-                              //&vMatrix,
                               &light_direction
                               );
 #   ifdef WRITE_DEPTH_VALUE
@@ -625,21 +629,23 @@ void DrawGL(void)
 
     Teapot_SetScaling(0.5f,0.5f,0.5f);
 
-    // First teapot
-    mat4_t mMatrix = m4_translation(vec3(1.0,0.1,3.0));
-    mvMatrix = m4_mul(vMatrix,mMatrix);
-    mvpMatrix = m4_mul(pMatrix,mvMatrix);
+    // First mesh (teapot)
+    mat4_t mMatrix = m4_translation(vec3(1.75,0.0,1.0));
+    Teapot_SetColor(1.f,1.f,0.5f,1.0f);
+    Teapot_Draw(m4_cvalue_ptr(&mMatrix),TEAPOT_MESH_TEAPOT);
 
-    Teapot_SetColor(1.f,1.f,0.f,1.0f);
-    Teapot_Draw(m4_cvalue_ptr(&mvMatrix),m4_cvalue_ptr(&mvpMatrix));
+    // second mesh (bunny)
+    mMatrix = m4_translation(vec3(-0.5,0.0,1.0));
+    Teapot_SetColor(0.5f,0.75f,1.0f,1.0f);
+    Teapot_Draw(m4_cvalue_ptr(&mMatrix),TEAPOT_MESH_BUNNY);
 
-    // second teapot
-    mMatrix = m4_translation(vec3(-1.0,0.1,3.0));
-    mvMatrix = m4_mul(vMatrix,mMatrix);
-    mvpMatrix = m4_mul(pMatrix,mvMatrix);
-
-    Teapot_SetColor(0.5f,0.5f,1.f,1.0f);
-    Teapot_Draw(m4_cvalue_ptr(&mvMatrix),m4_cvalue_ptr(&mvpMatrix));
+    // third mesh (test transparency)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_BLEND);
+    mMatrix = m4_translation(vec3(-0.5,0.0,-1.0));
+    Teapot_SetColor(1.0f,0.5f,0.5f,0.5f);
+    Teapot_Draw(m4_cvalue_ptr(&mMatrix),TEAPOT_MESH_CYLINDER);
+    glDisable(GL_BLEND);
 
     Teapot_PostDraw();
     }
@@ -1059,10 +1065,10 @@ int main(int argc, char** argv)
 
 
 //------------------------- Some init stuff -----------------------------
-    cameraTarget = vec3( -0.5f, -0.4f, 0.5f );
+    cameraTarget = vec3( 0.f, -0.4f, 0.0f );
     cameraMatrix = m4_identity();
-    m4_set_translation(&cameraMatrix,vec3(-0.5f+3.5*cos(0.1f*15.f + 6.0f*0.f), 1.0f + 2.0f*0.f, 0.5f + 4.0f*sin(0.1f*15.f + 6.0f*0.f)));    // start camera pos
-    m4_look_at_YX	(&cameraMatrix,cameraTarget,minCameraTargetDistance,maxCameraTargetDistance);
+    m4_set_translation(&cameraMatrix,vec3(0.0f, 1.25f, 3.75f));    // start camera pos
+    m4_look_at_YX(&cameraMatrix,cameraTarget,minCameraTargetDistance,maxCameraTargetDistance);
     cameraMatrixSlerp = cameraMatrix;	//Mandatory
     light_direction = v3_norm(vec3(-0.4, 0.7, -0.6));
 //------------------------------------------------------------------------

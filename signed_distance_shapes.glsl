@@ -542,7 +542,8 @@ vec3 render( in vec3 ro, in vec3 rd )
     	col = mix( col, vec3(0.8,0.9,1.0), 1.0-exp( -0.0002*t*t*t ) );
     }
 #   ifdef WRITE_DEPTH_VALUE
-    gl_FragDepth = (1.0/t - 1.0/iProjectionData.x)/(1.0/iProjectionData.y - 1.0/iProjectionData.x);
+    float zDot = dot(vec3(iCameraMatrix[2][0],iCameraMatrix[2][1],iCameraMatrix[2][2]),rd);
+    gl_FragDepth = (1.0/(t*zDot) - 1.0/iProjectionData.x)/(1.0/iProjectionData.y - 1.0/iProjectionData.x);
 #   endif //WRITE_DEPTH_VALUE
 	return vec3( clamp(col,0.0,1.0) );
 }

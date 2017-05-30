@@ -361,6 +361,10 @@ static __inline mat4_t m4_slerp(const mat4_t* T1,const mat4_t* T2,float t);
               void   m4_printp       (mat4_t matrix, int width, int precision);
               void   m4_fprint       (FILE* stream, mat4_t matrix);
               void   m4_fprintp      (FILE* stream, mat4_t matrix, int width, int precision);
+              void   m4_print_as_float_array        (mat4_t matrix);
+              void   m4_printp_as_float_array       (mat4_t matrix, int width, int precision);
+              void   m4_fprint_as_float_array       (FILE* stream, mat4_t matrix);
+              void   m4_fprintp_as_float_array      (FILE* stream, mat4_t matrix, int width, int precision);
 static __inline const float* m4_cvalue_ptr(const mat4_t* m) {return &m->m00;}
 static __inline       float* m4_value_ptr (mat4_t* m)       {return &m->m00;}
 
@@ -1067,10 +1071,10 @@ void m4_look_at_YX	(mat4_t* matrix,vec3_t to,float min_distance_allowed,float ma
 	if (min_distance_allowed<max_distance_allowed)	{
  		float distance=sqrt(Dxz2+D.y*D.y);
 		vec3_t zAxis = m4_get_z_axis(matrix);		
- 		if (distance<min_distance_allowed) 			
+        if (distance<min_distance_allowed)
 			m4_set_translation(matrix,v3_add(T,v3_muls(zAxis,distance-min_distance_allowed)));
  		else if (distance>max_distance_allowed) 
-			m4_set_translation(matrix,v3_add(T,v3_muls(zAxis,distance-max_distance_allowed)));
+            m4_set_translation(matrix,v3_add(T,v3_muls(zAxis,distance-max_distance_allowed)));
  	}		
 }
 
@@ -2003,6 +2007,27 @@ void m4_fprintp(FILE* stream, mat4_t matrix, int width, int precision) {
 		);
 	}
 }
+
+void m4_print_as_float_array(mat4_t matrix) {
+    m4_fprintp_as_float_array(stdout, matrix, 0, 4);
+}
+
+void m4_printp_as_float_array(mat4_t matrix, int width, int precision) {
+    m4_fprintp_as_float_array(stdout, matrix, width, precision);
+}
+
+void m4_fprint_as_float_array(FILE* stream, mat4_t matrix) {
+    m4_fprintp_as_float_array(stream, matrix, 0, 4);
+}
+
+void m4_fprintp_as_float_array(FILE* stream, mat4_t matrix, int width, int precision) {
+    const float* m = m4_cvalue_ptr(&matrix);
+    int w = width, p = precision, r;
+    fprintf(stream, "{");
+    for(r = 0; r < 16; r++) {fprintf(stream,"%*.*f",w,p,m[r]);if (r!=15) fprintf(stream,",");}
+    fprintf(stream, "};\n");
+}
+
 
 
 #endif // MATH_3D_IMPLEMENTATION

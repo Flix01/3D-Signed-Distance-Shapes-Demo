@@ -1,6 +1,6 @@
 # 3D-Signed-Distance-Shapes-Demo
 A ShaderToy's Demo by Inigo Quilez in a single main.c file
-![3d-signed-distance-shapes](https://cloud.githubusercontent.com/assets/9608982/26532499/7c4a4c9a-4402-11e7-8010-2a8e9f3642b5.png)
+![glsl signed distance shapes](https://cloud.githubusercontent.com/assets/9608982/26606477/56f45526-4592-11e7-89e3-f04cd6a92178.png)
 
 ### Dependencies
 * glut (or freeglut)
