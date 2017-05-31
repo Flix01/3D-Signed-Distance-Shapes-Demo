@@ -321,6 +321,7 @@ static __inline mat4_t mat4_rm(
 	float m20, float m21, float m22, float m23,
 	float m30, float m31, float m32, float m33
 );
+static __inline mat4_t mat4_from_float_array(float m[16]);
 
 static __inline mat4_t m4_identity     ();
 static __inline void m4_set_identity_mat3(mat4_t* matrix);
@@ -606,6 +607,16 @@ static __inline mat4_t mat4_rm(
 	m.m03=m03; m.m13=m13; m.m23=m23; m.m33=m33;
 	return m;
 }
+
+static __inline mat4_t mat4_from_float_array(float m[16])   {
+    mat4_t mat;
+    float* p = &mat.m00;
+    const float* pm = m;
+    int i;for (i=0;i<16;i++) *p++ = *pm++;
+    return mat;
+}
+
+
 
 static __inline mat4_t m4_identity() {
 	return mat4(

@@ -27,9 +27,9 @@ typedef enum {
     TEAPOT_MESH_SPHERE1,
     TEAPOT_MESH_SPHERE2,
     TEAPOT_MESH_CYLINDER_LATERAL_SURFACE,
-    TEAPOT_MESH_HALF_SPHERE_UP,         // These are not centered
-    TEAPOT_MESH_HALF_SPHERE_DOWN,       // These are not centered
-    //TEAPOT_MESH_CAPSULE,
+    TEAPOT_MESH_CAPSULE,
+    TEAPOT_MESH_HALF_SPHERE_UP,         // Warning: These is not centered when TEAPOT_CENTER_MESHES_ON_FLOOR is defined
+    TEAPOT_MESH_HALF_SPHERE_DOWN,       // Warning: These is not centered when TEAPOT_CENTER_MESHES_ON_FLOOR is defined
     TEAPOT_MESH_COUNT
 } TeapotMeshEnum;
 
@@ -54,8 +54,8 @@ void Teapot_Draw(const float mMatrix[16],TeapotMeshEnum meshId);   // Hp) mMatri
 
 void Teapot_PostDraw(void); // unsets program and buffers for drawing
 
-inline void Teapot_GetMeshCenter(TeapotMeshEnum meshId,float center[3]);
-inline void Teapot_GetMeshHalfAabb(TeapotMeshEnum meshId,float halfAabb[3]);
+__inline void Teapot_GetMeshCenter(TeapotMeshEnum meshId,float center[3]);
+__inline void Teapot_GetMeshHalfAabb(TeapotMeshEnum meshId,float halfAabb[3]);
 
 #endif //TEAPOT_H_
 
@@ -127,11 +127,12 @@ typedef struct {
     GLint uLoc_mvMatrix,uLoc_pMatrix,uLoc_scaling,uLoc_lightVector,uLoc_color,uLoc_colorSpecular;
 
     float vMatrix[16];
+    float scaling[3];
 } Teapot_Inner_Struct;
 static Teapot_Inner_Struct TIS;
 
 
-static inline GLuint Teapot_LoadShaderProgramFromSource(const char* vs,const char* fs);
+static __inline GLuint Teapot_LoadShaderProgramFromSource(const char* vs,const char* fs);
 
 void Teapot_SetViewMatrixAndLightDirection(const float vMatrix[16],const float lightDirectionWorldSpace[3])   {
     // lightDirectionViewSpace = v3_norm(m4_mul_dir(vMatrix,light_direction));
@@ -172,7 +173,10 @@ void Teapot_PreDraw(void)   {
     }
 }
 
-void Teapot_SetScaling(float scalingX, float scalingY, float scalingZ)  {glUniform4f(TIS.uLoc_scaling,scalingX,scalingY,scalingZ,1.f);}
+void Teapot_SetScaling(float scalingX, float scalingY, float scalingZ)  {
+    TIS.scaling[0]=scalingX;TIS.scaling[1]=scalingY;TIS.scaling[2]=scalingZ;
+    glUniform4f(TIS.uLoc_scaling,scalingX,scalingY,scalingZ,1.f);
+}
 void Teapot_SetColor(float R,float G,float B,float A)  {glUniform4f(TIS.uLoc_color,R,G,B,A);}
 #ifdef TEAPOT_SHADER_SPECULAR
 void Teapot_SetColorSpecular(float R, float G, float B, float SHI)  {glUniform4f(TIS.uLoc_colorSpecular,R,G,B,SHI);}
@@ -185,6 +189,42 @@ void Teapot_Draw(const float mMatrix[16], TeapotMeshEnum meshId)    {
     const float* m = mMatrix;
     float mvMatrix[16];
     int i,j,j4;
+    if (meshId==TEAPOT_MESH_COUNT) return;
+    if (meshId == TEAPOT_MESH_CAPSULE)  {
+        // We don't want to draw "scaled" capsules. Instead we want to regenerate valid capsules, reinterpreting Teapot_SetScaling(...)
+#       if (!defined(TEAPOT_NO_MESH_CYLINDER) && !defined(TEAPOT_NO_MESH_HALF_SPHERE_UP) && !defined(TEAPOT_NO_MESH_HALF_SPHERE_DOWN))
+        const float height = TIS.scaling[1];
+        const float diameter = (TIS.scaling[0]+TIS.scaling[2])*0.5f;
+        const float pushScaling[3] = {TIS.scaling[0],TIS.scaling[1],TIS.scaling[2]};
+        const float yAxis[3] = {mMatrix[4],mMatrix[5],mMatrix[6]};
+        const float centerY = TIS.centerPoint[TEAPOT_MESH_CYLINDER_LATERAL_SURFACE][1];
+        const float origin[3] = {mMatrix[12],mMatrix[13]-diameter*centerY,mMatrix[14]};
+        float tmp;
+        float mat[16];memcpy(mat,mMatrix,sizeof(mat));
+        mat[12] = origin[0];    mat[13] = origin[1];    mat[14] = origin[2];
+
+        Teapot_SetScaling(diameter,height,diameter);
+        Teapot_Draw(mat,TEAPOT_MESH_CYLINDER_LATERAL_SURFACE);
+
+        // TEAPOT_MESH_HALF_SPHERE_UP and TEAPOT_MESH_HALF_SPHERE_DOWN are not affected by TEAPOT_CENTER_MESHES_ON_FLOOR
+        Teapot_SetScaling(diameter,diameter,diameter);
+        tmp = height*(0.5f-centerY);
+        mat[12] = origin[0] + yAxis[0]*tmp;
+        mat[13] = origin[1] + yAxis[1]*tmp;
+        mat[14] = origin[2] + yAxis[2]*tmp;
+        Teapot_Draw(mat,TEAPOT_MESH_HALF_SPHERE_UP);
+
+        tmp = -height*(0.5f+centerY);
+        mat[12] = origin[0] + yAxis[0]*tmp;
+        mat[13] = origin[1] + yAxis[1]*tmp;
+        mat[14] = origin[2] + yAxis[2]*tmp;
+        Teapot_Draw(mat,TEAPOT_MESH_HALF_SPHERE_DOWN);
+
+        Teapot_SetScaling(pushScaling[0],pushScaling[1],pushScaling[2]);
+        #endif // !defined(...)
+        return;
+    }
+
     for(i = 0; i < 4; i++) {
         for(j = 0; j < 4; j++) {
             j4 = 4*j;
@@ -198,11 +238,8 @@ void Teapot_Draw(const float mMatrix[16], TeapotMeshEnum meshId)    {
 
     glUniformMatrix4fv(TIS.uLoc_mvMatrix, 1 /*only setting 1 matrix*/, GL_FALSE /*transpose?*/, mvMatrix);
 
-    //if (meshId<TEAPOT_MESH_CAPSULE)
-        glDrawElements(GL_TRIANGLES,TIS.numInds[meshId],GL_UNSIGNED_SHORT,(const void*) (TIS.startInds[meshId]*sizeof(unsigned short)));
-    /*else if (meshId==TEAPOT_MESH_CAPSULE) {
-        // TODO
-    }*/
+    glDrawElements(GL_TRIANGLES,TIS.numInds[meshId],GL_UNSIGNED_SHORT,(const void*) (TIS.startInds[meshId]*sizeof(unsigned short)));
+
 }
 
 void Teapot_PostDraw(void)  {
@@ -214,7 +251,7 @@ void Teapot_PostDraw(void)  {
 
 
 // Loading shader function
-static inline GLhandleARB Teapot_LoadShader(const char* buffer, const unsigned int type)
+static __inline GLhandleARB Teapot_LoadShader(const char* buffer, const unsigned int type)
 {
     GLhandleARB handle;
     const GLcharARB* files[1];
@@ -270,7 +307,7 @@ static inline GLhandleARB Teapot_LoadShader(const char* buffer, const unsigned i
     return handle;
 }
 
-static inline GLuint Teapot_LoadShaderProgramFromSource(const char* vs,const char* fs)	{
+static __inline GLuint Teapot_LoadShaderProgramFromSource(const char* vs,const char* fs)	{
     // shader Compilation variable
     GLint result;				// Compilation code result
     GLint errorLoglength ;
@@ -325,7 +362,7 @@ static inline GLuint Teapot_LoadShaderProgramFromSource(const char* vs,const cha
 // numVerts is the number of vertices (= number of 3 floats)
 // numInds is the number of triangle indices (= 3 * num triangles)
 // pNormsOut must be the same size as pVerts
-inline static void CalculateVertexNormals(const float* pVerts,int numVerts,const unsigned short* pInds,int numInds,float* pNormsOut)   {
+__inline static void CalculateVertexNormals(const float* pVerts,int numVerts,const unsigned short* pInds,int numInds,float* pNormsOut)   {
     if (!pVerts || !pNormsOut || !pInds || numInds<3 || numVerts<3) return;
     // Calculate vertex normals
     {
@@ -367,7 +404,7 @@ inline static void CalculateVertexNormals(const float* pVerts,int numVerts,const
 }
 
 // numVerts is the number of vertices (= number of 3 floats)
-inline static void GetAabbHalfExtentsAndCenter(const float* pVerts,const int numVerts,float halfExtentsOut[3],float centerPointOut[3])	{
+__inline static void GetAabbHalfExtentsAndCenter(const float* pVerts,const int numVerts,float halfExtentsOut[3],float centerPointOut[3])	{
     float minValue[3];float maxValue[3];float tempVert[3];int i,i3;
     if (pVerts && numVerts>0)	{
         minValue[0]=maxValue[0]=pVerts[0];minValue[1]=maxValue[1]=pVerts[1];minValue[2]=maxValue[2]=pVerts[2];
@@ -463,17 +500,17 @@ static void AddMeshVertsAndInds(float* totVerts,const int MAX_TOTAL_VERTS,int* n
             pTotVerts[i] += TIS.halfExtents[meshId][1];
         }
     }
-    TIS.centerPoint[meshId][1] = 0;
+    TIS.centerPoint[meshId][1]-= TIS.halfExtents[meshId][1];
 #   endif //TEAPOT_CENTER_MESHES_ON_FLOOR
 
     *numTotVerts+=numVerts;
     *numTotInds+=numInds;
 }
 
-inline void Teapot_GetMeshCenter(TeapotMeshEnum meshId,float center[3]) {
+__inline void Teapot_GetMeshCenter(TeapotMeshEnum meshId,float center[3]) {
     center[0] = TIS.centerPoint[meshId][0];center[1] = TIS.centerPoint[meshId][1];center[2] = TIS.centerPoint[meshId][2];
 }
-inline void Teapot_GetMeshHalfAabb(TeapotMeshEnum meshId,float halfAabb[3]) {
+__inline void Teapot_GetMeshHalfAabb(TeapotMeshEnum meshId,float halfAabb[3]) {
     halfAabb[0] = TIS.halfExtents[meshId][0];halfAabb[1] = TIS.halfExtents[meshId][1];halfAabb[2] = TIS.halfExtents[meshId][2];
 }
 
@@ -1020,8 +1057,8 @@ void Teapot_Init(void) {
             case TEAPOT_MESH_CYLINDER_LATERAL_SURFACE: {
 #               ifndef TEAPOT_NO_MESH_CYLINDER
                 {
-                    TIS.startInds[i] = TIS.startInds[TEAPOT_MESH_CYLINDER]+24;
-                    TIS.numInds[i] = TIS.numInds[TEAPOT_MESH_CYLINDER]-24;
+                    TIS.startInds[i] = TIS.startInds[TEAPOT_MESH_CYLINDER]+72;
+                    TIS.numInds[i] = TIS.numInds[TEAPOT_MESH_CYLINDER]-72;
                     for (j=0;j<3;j++) {
                         TIS.halfExtents[i][j] = TIS.halfExtents[TEAPOT_MESH_CYLINDER][j];
                         TIS.centerPoint[i][j] = TIS.centerPoint[TEAPOT_MESH_CYLINDER][j];
@@ -1029,7 +1066,7 @@ void Teapot_Init(void) {
                 }
 #               endif
             }
-                break;
+                break;                               
             case TEAPOT_MESH_HALF_SPHERE_UP: {
 #               ifndef TEAPOT_MESH_HALF_SPHERE_UP
                 {
@@ -1082,10 +1119,27 @@ void Teapot_Init(void) {
 #               endif
             }
                 break;
+            case TEAPOT_MESH_CAPSULE: {
+#               if (!defined(TEAPOT_NO_MESH_CYLINDER) && !defined(TEAPOT_NO_MESH_HALF_SPHERE_UP) && !defined(TEAPOT_NO_MESH_HALF_SPHERE_DOWN))
+                {
+                    TIS.startInds[i] = 0;
+                    TIS.numInds[i] = 0;
+                    for (j=0;j<3;j++) {
+                        TIS.halfExtents[i][j] = TIS.halfExtents[TEAPOT_MESH_CYLINDER][j];
+                        TIS.centerPoint[i][j] = TIS.centerPoint[TEAPOT_MESH_CYLINDER][j];
+                    }
+                    TIS.halfExtents[i][1] += TIS.halfExtents[TEAPOT_MESH_HALF_SPHERE_UP][1]+TIS.halfExtents[TEAPOT_MESH_HALF_SPHERE_DOWN][1];
+#                   ifdef TEAPOT_CENTER_MESHES_ON_FLOOR
+                    TIS.centerPoint[i][1]-=TIS.halfExtents[TEAPOT_MESH_HALF_SPHERE_DOWN][1];
+#                   endif //TEAPOT_CENTER_MESHES_ON_FLOOR
+                }
+#               endif
+            }
+                break;
             }
         }
 
-        printf("Teapot_init(): numTotVerts = %d numTotInds = %d",numTotVerts,numTotInds);
+        //printf("Teapot_init(): numTotVerts = %d numTotInds = %d",numTotVerts,numTotInds);
 
         CalculateVertexNormals(totVerts,numTotVerts,totInds,numTotInds,norms);
 

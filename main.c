@@ -47,7 +47,7 @@
 
 #ifdef WRITE_DEPTH_VALUE
 #define TEAPOT_IMPLEMENTATION
-#define TEAPOT_CENTER_MESHES_ON_FLOOR   // (Optional) Otherwise meshes are centered in their local center
+#define TEAPOT_CENTER_MESHES_ON_FLOOR   // (Optional) Otherwise meshes are centered in their local aabb center
 //#define TEAPOT_INVERT_MESHES_Z_AXIS     // (Optional) Otherwise meshes look in the opposite Z direction
 //#define TEAPOT_SHADER_SPECULAR          // (Optional) specular hilights
 #include "teapot.h"
@@ -646,6 +646,30 @@ void DrawGL(void)
     Teapot_SetColor(1.0f,0.5f,0.5f,0.5f);
     Teapot_Draw(m4_cvalue_ptr(&mMatrix),TEAPOT_MESH_CYLINDER);
     glDisable(GL_BLEND);
+
+    // fourth mesh (capsule)
+    Teapot_SetScaling(0.25f,0.5f,0.25f);
+    // For capsules, Teapot_SetScaling(x,y,z) is interpreted this way:
+    // diameter = (x+z)/2; cylinderHeight = y. So the total height is: (cylinderHeight + diameter)
+    // This was made to force uniform scaling of the two half spheres.
+    mMatrix = m4_rotation_z(-M_PI*0.334f);
+    m4_set_translation(&mMatrix,vec3(1.75,0.0,0.0));
+    Teapot_SetColor(0.5f,0.75f,1.0f,1.0f);
+    Teapot_Draw(m4_cvalue_ptr(&mMatrix),TEAPOT_MESH_CAPSULE);
+
+    /*{ // All meshes
+        Teapot_SetScaling(0.5f,0.5f,0.5f);
+        Teapot_SetColor(1.0f,0.75f,0.5f,1.0f);
+        int i;
+        for (i=0;i<TEAPOT_MESH_COUNT;i++)   {
+            mMatrix = m4_translation(vec3(-1.75,0.0,-TEAPOT_MESH_COUNT*0.5f+1.f*i));
+            Teapot_Draw(m4_cvalue_ptr(&mMatrix),i);
+        }
+        // Please note that, unlike all the other meshes, the last two meshes: TEAPOT_MESH_HALF_SPHERE_UP and TEAPOT_MESH_HALF_SPHERE_DOWN
+        // are always centered in the virtual center of their full sphere (regardless of the TEAPOT_CENTER_MESHES_ON_FLOOR definition):
+        // they're there mainly for internal use when drawing: TEAPOT_MESH_CAPSULE
+    }*/
+
 
     Teapot_PostDraw();
     }
