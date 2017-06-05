@@ -83,6 +83,9 @@ Ported code back to --std=gnu89 [Basically ansi C with single line comments allo
 #include <math.h>
 #include <stdio.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Define PI directly because we would need to define the _BSD_SOURCE or
 // _XOPEN_SOURCE feature test macros to get it from math.h. That would be a
@@ -110,7 +113,7 @@ Ported code back to --std=gnu89 [Basically ansi C with single line comments allo
 // So you can just upload the vectors into shaders as they are.
 //
 
-typedef struct { float x, y, z; } vec3_t;
+typedef union {struct {float x, y, z;};float v[3];} vec3_t;
 static __inline vec3_t vec3(float x, float y, float z)        { vec3_t v;v.x=x;v.y=y;v.z=z;return v; }
 
 static __inline vec3_t v3_add   (vec3_t a, vec3_t b)          { return vec3( a.x + b.x, a.y + b.y, a.z + b.z ); }
@@ -132,8 +135,6 @@ static __inline vec3_t v3_lerp(vec3_t a, vec3_t b,float t)   { float ct = 1.f-t;
               void   v3_printp       (vec3_t v, int width, int precision);
               void   v3_fprint       (FILE* stream, vec3_t v);
               void   v3_fprintp      (FILE* stream, vec3_t v, int width, int precision);
-static __inline const float* v3_cvalue_ptr(const vec3_t* v) {return &v->x;}
-static __inline       float* v3_value_ptr (vec3_t* v)       {return &v->x;}
 
 //
 // quaternions
@@ -142,7 +143,7 @@ static __inline       float* v3_value_ptr (vec3_t* v)       {return &v->x;}
 // with the `qt_` prefix.
 // 
 
-typedef struct { float x, y, z, w; } quat_t;
+typedef union {struct {float x, y, z, w;};float v[4];} quat_t;
 static __inline quat_t quat(float x, float y, float z,float w)        { quat_t q;q.x=x;q.y=y;q.z=z;q.w=w;return q; }
 
 static __inline float  qt_dot   (quat_t a, quat_t b)          { return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;        }
@@ -155,10 +156,6 @@ static __inline quat_t qt_norm(quat_t q)                      { float len=qt_len
               void   qt_printp       (quat_t q, int width, int precision);
               void   qt_fprint       (FILE* stream, quat_t q);
               void   qt_fprintp      (FILE* stream, quat_t q, int width, int precision);
-static __inline const float* qt_cvalue_ptr(const quat_t* q) {return &q->x;}
-static __inline       float* qt_value_ptr (quat_t* q)       {return &q->x;}
-
-
 
 
 //
@@ -206,6 +203,8 @@ typedef union {
 		float m10, m11, m12;
 		float m20, m21, m22;
 	};
+    // When we need to cast it to an array ptr we can just use 'v'
+    float v[9];
 } mat3_t;
 
 static __inline mat3_t mat3(
@@ -253,9 +252,6 @@ static __inline mat3_t m3_mul          (mat3_t a, mat3_t b);
               void   m3_printp       (mat3_t matrix, int width, int precision);
               void   m3_fprint       (FILE* stream, mat3_t matrix);
               void   m3_fprintp      (FILE* stream, mat3_t matrix, int width, int precision);
-static __inline const float* m3_cvalue_ptr(const mat3_t* m) {return &m->m00;}
-static __inline       float* m3_value_ptr (mat3_t* m)       {return &m->m00;}
-
 
 //
 // 4x4 matrices
@@ -307,6 +303,8 @@ typedef union {
 		float m20, m21, m22, m23;
 		float m30, m31, m32, m33;
 	};
+    // When we need to cast it to an array ptr we can just use 'v'
+    float v[16];
 } mat4_t;
 
 static __inline mat4_t mat4(
@@ -321,7 +319,7 @@ static __inline mat4_t mat4_rm(
 	float m20, float m21, float m22, float m23,
 	float m30, float m31, float m32, float m33
 );
-static __inline mat4_t mat4_from_float_array(float m[16]);
+static __inline mat4_t mat4_from_array(float m[16]);
 
 static __inline mat4_t m4_identity     ();
 static __inline void m4_set_identity_mat3(mat4_t* matrix);
@@ -362,13 +360,10 @@ static __inline mat4_t m4_slerp(const mat4_t* T1,const mat4_t* T2,float t);
               void   m4_printp       (mat4_t matrix, int width, int precision);
               void   m4_fprint       (FILE* stream, mat4_t matrix);
               void   m4_fprintp      (FILE* stream, mat4_t matrix, int width, int precision);
-              void   m4_print_as_float_array        (mat4_t matrix);
-              void   m4_printp_as_float_array       (mat4_t matrix, int width, int precision);
-              void   m4_fprint_as_float_array       (FILE* stream, mat4_t matrix);
-              void   m4_fprintp_as_float_array      (FILE* stream, mat4_t matrix, int width, int precision);
-static __inline const float* m4_cvalue_ptr(const mat4_t* m) {return &m->m00;}
-static __inline       float* m4_value_ptr (mat4_t* m)       {return &m->m00;}
-
+              void   m4_print_as__array        (mat4_t matrix);
+              void   m4_printp_as__array       (mat4_t matrix, int width, int precision);
+              void   m4_fprint_as__array       (FILE* stream, mat4_t matrix);
+              void   m4_fprintp_as__array      (FILE* stream, mat4_t matrix, int width, int precision);
 
 
 //
@@ -608,11 +603,9 @@ static __inline mat4_t mat4_rm(
 	return m;
 }
 
-static __inline mat4_t mat4_from_float_array(float m[16])   {
+static __inline mat4_t mat4_from_array(float m[16])   {
     mat4_t mat;
-    float* p = &mat.m00;
-    const float* pm = m;
-    int i;for (i=0;i<16;i++) *p++ = *pm++;
+    int i;for (i=0;i<16;i++) mat.v[i] = m[i];
     return mat;
 }
 
@@ -791,10 +784,18 @@ static __inline mat4_t m4_invert_fast(mat4_t matrix)	{
 	return inv;
 }
 
+#ifdef __cplusplus
+}
+#endif
+
 #endif // MATH_3D_HEADER
 
 
 #ifdef MATH_3D_IMPLEMENTATION
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 void v3_print(vec3_t v) {
 	v3_fprintp(stdout, v, 6, 2);
@@ -974,9 +975,9 @@ vec3_t m3_mul_dir(mat3_t matrix, vec3_t direction) {
 
 // Not sure here if I have to invert m[i][j] with m[j][i]
 quat_t m3_get_quaternion(const mat3_t* matrix) {
-	const mat3_t* m = matrix;		
-	float trace = m->m00 + m->m11 + m->m22;
+	const mat3_t* m = matrix;		    
 	float temp[4];
+	float trace = m->m00 + m->m11 + m->m22;
 	if (trace > 0.f) {
 		float s = sqrt(trace + 1.0f);
 		temp[3]=(s * 0.5f);s = 0.5f / s;
@@ -997,6 +998,37 @@ quat_t m3_get_quaternion(const mat3_t* matrix) {
 		temp[k] = (m->m[i][k] + m->m[k][i]) * s;
 	}
 	return quat(temp[0],temp[1],temp[2],temp[3]);
+
+/* MIKE_DAY_VERSION: here just for reference (can be ported, but it's not clear if mij must be turned into mji)
+	float t;
+	if (m->m22 < 0)
+	{
+	    if (m->m00 > m->m11)
+	    {
+		t= 1 + m->m00 - m->m11 - m->m22;
+		q = quat( t, m->m01+m->m10, m->m20+m->m02, m->m12-m->m21 );
+	    }
+	    else
+	    {
+		t= 1 -m->m00 + m->m11 -m->m22;
+		q = quat( m->m01+m->m10, t, m->m12+m->m21, m->m20-m->m02 );
+	    }
+	}
+	else
+	{
+	    if (m->m00 < -m->m11)
+	    {
+		t= 1 -m->m00 -m->m11 + m->m22;
+		q = quat( m->m20+m->m02, m->m12+m->m21, t, m01-m10 );
+	    }
+	    else	{
+		t=1+m->m00+m->m11+m->m22;
+		q = quat(m->m12-m->m21,m->m20-m->m02,m->m01-m->m10,t);
+	    }
+	}
+	q *=0.5/sqrt(t);
+*/
+
 }
 // Not sure here if I have to invert m[i][j] with m[j][i]
 void  m3_set_quaternion(mat3_t* matrix,quat_t q)	{
@@ -2019,27 +2051,28 @@ void m4_fprintp(FILE* stream, mat4_t matrix, int width, int precision) {
 	}
 }
 
-void m4_print_as_float_array(mat4_t matrix) {
-    m4_fprintp_as_float_array(stdout, matrix, 0, 4);
+void m4_print_as__array(mat4_t matrix) {
+    m4_fprintp_as__array(stdout, matrix, 0, 4);
 }
 
-void m4_printp_as_float_array(mat4_t matrix, int width, int precision) {
-    m4_fprintp_as_float_array(stdout, matrix, width, precision);
+void m4_printp_as__array(mat4_t matrix, int width, int precision) {
+    m4_fprintp_as__array(stdout, matrix, width, precision);
 }
 
-void m4_fprint_as_float_array(FILE* stream, mat4_t matrix) {
-    m4_fprintp_as_float_array(stream, matrix, 0, 4);
+void m4_fprint_as__array(FILE* stream, mat4_t matrix) {
+    m4_fprintp_as__array(stream, matrix, 0, 4);
 }
 
-void m4_fprintp_as_float_array(FILE* stream, mat4_t matrix, int width, int precision) {
-    const float* m = m4_cvalue_ptr(&matrix);
+void m4_fprintp_as__array(FILE* stream, mat4_t matrix, int width, int precision) {
     int w = width, p = precision, r;
     fprintf(stream, "{");
-    for(r = 0; r < 16; r++) {fprintf(stream,"%*.*f",w,p,m[r]);if (r!=15) fprintf(stream,",");}
+    for(r = 0; r < 16; r++) {fprintf(stream,"%*.*f",w,p,matrix.v[r]);if (r!=15) fprintf(stream,",");}
     fprintf(stream, "};\n");
 }
 
-
+#ifdef __cplusplus
+}
+#endif
 
 #endif // MATH_3D_IMPLEMENTATION
 

@@ -1,7 +1,8 @@
 //#define USE_GLEW
 //#define NO_FIXED_FUNCTION_PIPELINE
-//#define WRITE_DEPTH_VALUE		// This needs to be defined in "signed_distance_shapes.glsl" as well to make it active.
-                                // (the idea was to mix glutSolidTeapot() with the raytrace output),
+//#define WRITE_DEPTH_VALUE		// This needs USE_UNIFORM_CAMERA_MATRIX to be defined in "signed_distance_shapes.glsl" as well to make it work.
+                                // (the idea was to mix glutSolidTeapot() with the raytrace output).
+                                // => Better define this at the command-line if needed <=
 #define NUM_RENDER_TARGETS (3)	// Must be >0   // if >1 creates an update lag (but should be faster)
 
 
@@ -10,7 +11,7 @@
 #	undef NO_FIXED_FUNCTION_PIPELINE
 #	define NO_FIXED_FUNCTION_PIPELINE
 #   ifdef WRITE_DEPTH_VALUE
-#   error WRITE_DEPTH_VALUE in emscripten produces a wrong FBO (no depth render buffer support in WebGL 1)
+#   error WRITE_DEPTH_VALUE is not supported in WebGL (no depth render buffer support in FBO and no gl_FragDepth in fragment shader)
 #   endif //WRITE_DEPTH_VALUE
 #endif //__EMSCRIPTEN__
 
@@ -288,6 +289,7 @@ typedef struct {
 
     GLint uLoc_iCameraMatrix;
     GLint uLoc_iProjectionData;
+    GLint uLoc_iProjectionData2;
     GLint uLoc_iLightDirection;
 } MyShaderStuff;
 void MyShaderStuff_Create(MyShaderStuff* p) {
@@ -297,6 +299,17 @@ void MyShaderStuff_Create(MyShaderStuff* p) {
         fprintf(stderr,"Error: \"%s\" not found\n",fsFileName);
         return;
     }
+#   ifdef WRITE_DEPTH_VALUE
+    // Delicate part: overwrite "fragmentShaderCode" to define WRITE_DEPTH_VALUE on the fly there too
+    {
+       const char def[] = "#define WRITE_DEPTH_VALUE\n//";
+       char* firstNewLine = strchr(fragmentShaderCode,'\n'); // We'd like to leave the first line of the shader intact
+       if (firstNewLine) {
+           ++firstNewLine;
+           memcpy(firstNewLine,def,strlen(def));    // a bit unsafe
+       }
+    }
+#   endif
     p->programId = loadShaderProgramFromSource(ScreenQuadVS,fragmentShaderCode);
     //progParams.programId = loadShaderProgram("default.vs",fsFileName);
     if (!p->programId) return;
@@ -306,14 +319,18 @@ void MyShaderStuff_Create(MyShaderStuff* p) {
     p->uLoc_iGlobalTime = glGetUniformLocation(p->programId,"iGlobalTime");
     p->uLoc_iCameraMatrix = glGetUniformLocation(p->programId,"iCameraMatrix");
     p->uLoc_iProjectionData = glGetUniformLocation(p->programId,"iProjectionData");
+    p->uLoc_iProjectionData2 = glGetUniformLocation(p->programId,"iProjectionData2");
     p->uLoc_iLightDirection = glGetUniformLocation(p->programId,"iLightDirection");
 
 }
 void MyShaderStuff_Destroy(MyShaderStuff* p) {if (p->programId) glDeleteProgram(p->programId);p->programId=0;}
 void MyShaderStuff_SetProjectionUniforms(MyShaderStuff* p,float nearPlane,float farPlane,float degFov,float aspectRatio) {
+    float tanFov;
     if (p==NULL || p->programId==0) return;
     glUseProgram(p->programId);
-    glUniform4f(p->uLoc_iProjectionData,nearPlane,farPlane,tan(degFov*M_PIOVER180*0.5f),aspectRatio);
+    tanFov = tan(degFov*M_PIOVER180*0.5f);
+    glUniform4f(p->uLoc_iProjectionData,nearPlane,farPlane,tanFov,aspectRatio);
+    glUniform4f(p->uLoc_iProjectionData2,-nearPlane*tanFov*aspectRatio,nearPlane*tanFov,1.f/nearPlane,1.f/farPlane-1.f/nearPlane);
     glUseProgram(0);
 }
 void MyShaderStuff_SetUniforms(MyShaderStuff* p,int resX,int resY,float globalTime,const mat4_t* m,const vec3_t* lig_dir) {
@@ -321,7 +338,7 @@ void MyShaderStuff_SetUniforms(MyShaderStuff* p,int resX,int resY,float globalTi
     glUniform2f(p->uLoc_iResolution,resX,resY);
     glUniform1f(p->uLoc_iGlobalTime,globalTime);
     if (m!=NULL) glUniformMatrix4fv(p->uLoc_iCameraMatrix, 1 /*only setting 1 matrix*/, GL_FALSE /*transpose?*/, &m->m[0][0]);
-    if (lig_dir) glUniform3fv(p->uLoc_iLightDirection,1,v3_cvalue_ptr(lig_dir));
+    if (lig_dir) glUniform3fv(p->uLoc_iLightDirection,1,lig_dir->v);
 }
 MyShaderStuff progParams;
 
@@ -496,7 +513,7 @@ void ResizeGL(int w,int h) {
         MyShaderStuff_SetProjectionUniforms(&progParams,nearPlane,farPlane,degFov,(float)w/(float)h);
 
 #       ifdef WRITE_DEPTH_VALUE
-        Teapot_SetProjectionMatrix(m4_cvalue_ptr(&pMatrix));
+        Teapot_SetProjectionMatrix(pMatrix.v);
 #       endif
     }
 
@@ -573,7 +590,7 @@ void DrawGL(void)
     vMatrix = m4_invert_fast(
                 m4_invert_XZ_axis(&cameraMatrix))   // This is necessary to invert the camera convention so that we can use for all objects (camera included): +X = left, +Y = up, +Z = forward
                 ;
-    Teapot_SetViewMatrixAndLightDirection(m4_cvalue_ptr(&vMatrix),v3_cvalue_ptr(&light_direction));
+    Teapot_SetViewMatrixAndLightDirection(vMatrix.v,light_direction.v);
 #   endif //WRITE_DEPTH_VALUE
 
 
@@ -632,19 +649,19 @@ void DrawGL(void)
     // First mesh (teapot)
     mat4_t mMatrix = m4_translation(vec3(1.75,0.0,1.0));
     Teapot_SetColor(1.f,1.f,0.5f,1.0f);
-    Teapot_Draw(m4_cvalue_ptr(&mMatrix),TEAPOT_MESH_TEAPOT);
+    Teapot_Draw(mMatrix.v,TEAPOT_MESH_TEAPOT);
 
     // second mesh (bunny)
     mMatrix = m4_translation(vec3(-0.5,0.0,1.0));
     Teapot_SetColor(0.5f,0.75f,1.0f,1.0f);
-    Teapot_Draw(m4_cvalue_ptr(&mMatrix),TEAPOT_MESH_BUNNY);
+    Teapot_Draw(mMatrix.v,TEAPOT_MESH_BUNNY);
 
     // third mesh (test transparency)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_BLEND);
     mMatrix = m4_translation(vec3(-0.5,0.0,-1.0));
     Teapot_SetColor(1.0f,0.5f,0.5f,0.5f);
-    Teapot_Draw(m4_cvalue_ptr(&mMatrix),TEAPOT_MESH_CYLINDER);
+    Teapot_Draw(mMatrix.v,TEAPOT_MESH_CYLINDER);
     glDisable(GL_BLEND);
 
     // fourth mesh (capsule)
@@ -655,7 +672,7 @@ void DrawGL(void)
     mMatrix = m4_rotation_z(-M_PI*0.334f);
     m4_set_translation(&mMatrix,vec3(1.75,0.0,0.0));
     Teapot_SetColor(0.5f,0.75f,1.0f,1.0f);
-    Teapot_Draw(m4_cvalue_ptr(&mMatrix),TEAPOT_MESH_CAPSULE);
+    Teapot_Draw(mMatrix.v,TEAPOT_MESH_CAPSULE);
 
     /*{ // All meshes
         Teapot_SetScaling(0.5f,0.5f,0.5f);
@@ -663,7 +680,7 @@ void DrawGL(void)
         int i;
         for (i=0;i<TEAPOT_MESH_COUNT;i++)   {
             mMatrix = m4_translation(vec3(-1.75,0.0,-TEAPOT_MESH_COUNT*0.5f+1.f*i));
-            Teapot_Draw(m4_cvalue_ptr(&mMatrix),i);
+            Teapot_Draw(mMatrix.v,i);
         }
         // Please note that, unlike all the other meshes, the last two meshes: TEAPOT_MESH_HALF_SPHERE_UP and TEAPOT_MESH_HALF_SPHERE_DOWN
         // are always centered in the virtual center of their full sphere (regardless of the TEAPOT_CENTER_MESHES_ON_FLOOR definition):
@@ -984,7 +1001,9 @@ void GlutDestroyWindow(void) {
         DestroyGL();
 
         if (gameModeWindowId) {
+#           ifndef __EMSCRIPTEN__
             glutLeaveGameMode();
+#           endif
             gameModeWindowId = 0;
         }
         if (windowId) {
@@ -995,6 +1014,7 @@ void GlutDestroyWindow(void) {
 }
 void GlutCreateWindow() {
     GlutDestroyWindow();
+#   ifndef __EMSCRIPTEN__
     if (config.fullscreen_enabled)	{
         const int screenWidth = glutGet(GLUT_SCREEN_WIDTH);
         const int screenHeight = glutGet(GLUT_SCREEN_HEIGHT);
@@ -1011,6 +1031,7 @@ void GlutCreateWindow() {
             if (glutGameModeGet (GLUT_GAME_MODE_POSSIBLE)) gameModeWindowId = glutEnterGameMode();
         }
     }
+#   endif
     if (!gameModeWindowId) {
         config.fullscreen_enabled = 0;
         glutInitWindowPosition(100,100);

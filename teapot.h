@@ -3,17 +3,26 @@
 
 /* LICENSE: Made by @Flix01. MIT license on my part.
  * But I don't know the license of the original Teapot mesh data,
- * and of the Bunny and Torus meshes (from the Bullet Physics Engine's GImpact Old Demo)
+ * and of the Bunny and Torus meshes (these two from the Bullet Physics Engine's GImpact Old Demo)
  * I've made the other meshes myself.
  * You can disable some meshes with something like TEAPOT_NO_MESH_BUNNY (never tested).
 */
 
+/* WHAT'S THIS?
+ * A plain C (--std=gnu89) header-only file that can be used to display the teapot mesh (and other meshes),
+ * in a (modern) openGL program, with a very simple API and no other dependencies (everything is in the teapot.h file).
+*/
+
 /* USAGE:
-Please see the comments of the functions below and try to follow their order when you call them.
-Define TEAPOT_IMPLEMENTATION in one of your .c files before the inclusion of this file.
+ * Please see the comments of the functions below and try to follow their order when you call them.
+ * Define TEAPOT_IMPLEMENTATION in one of your .c (or .cpp) files before the inclusion of this file.
 */
 // OPTIONAL DEFINITIONS:
-//#define TEAPOT_SHADER_SPECULAR // Adds specular light component in the shader
+//#define TEAPOT_SHADER_SPECULAR // Adds specular light component in the shader and Teapot_SetColorSpecular(...) function
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef enum {
     TEAPOT_MESH_TEAPOT=0,
@@ -27,7 +36,7 @@ typedef enum {
     TEAPOT_MESH_SPHERE1,
     TEAPOT_MESH_SPHERE2,
     TEAPOT_MESH_CYLINDER_LATERAL_SURFACE,
-    TEAPOT_MESH_CAPSULE,
+    TEAPOT_MESH_CAPSULE,		// Warning: this is special: itsHeight=scaling.y+(scaling.x+scaling.z)*0.5f; itsDiameter=(scaling.x+scaling.z)*0.5f; (this avoids non-uniform scaling)
     TEAPOT_MESH_HALF_SPHERE_UP,         // Warning: These is not centered when TEAPOT_CENTER_MESHES_ON_FLOOR is defined
     TEAPOT_MESH_HALF_SPHERE_DOWN,       // Warning: These is not centered when TEAPOT_CENTER_MESHES_ON_FLOOR is defined
     TEAPOT_MESH_COUNT
@@ -37,16 +46,16 @@ void Teapot_Init(void);     // In your InitGL() method
 void Teapot_Destroy(void);  // In your DestroyGL() method (cleanup)
 
 // In your InitGL() and ResizeGL() methods:
-void Teapot_SetProjectionMatrix(const float pMatrix[16]);                 // Sets the projection matrix [Warning: it calls glUseProgram(0); at the end => call it outside Teapot_PreDraw()/Teapot_PostDraw()]
+void Teapot_SetProjectionMatrix(const float pMatrix[16]);   // Sets the projection matrix [Warning: it calls glUseProgram(0); at the end => call it outside Teapot_PreDraw()/Teapot_PostDraw()]
 
 
 // In your DrawGL() method:
-void Teapot_SetViewMatrixAndLightDirection(const float vMatrix[16],const float lightDirectionWorldSpace[3]);    // vMatrix CAN'T HAVE any scaling! Sets the camera view matrix (= lookAt matrix) and the directional light in world space [Warning: it calls glUseProgram(0); at the end => call it outside Teapot_PreDraw()/Teapot_PostDraw()]
+void Teapot_SetViewMatrixAndLightDirection(const float vMatrix[16],const float lightDirectionWorldSpace[3]);    // vMatrix CAN'T HAVE any scaling! Sets the camera view matrix (= gluLookAt matrix) and the directional light in world space [Warning: it calls glUseProgram(0); at the end => call it outside Teapot_PreDraw()/Teapot_PostDraw()]
 
 void Teapot_PreDraw(void);  // sets program and buffers for drawing
 
 void Teapot_SetScaling(float scalingX,float scalingY,float scalingZ);   // Optional (last set is used)
-void Teapot_SetColor(float R, float G, float B, float A);       // Optional (last set is used)
+void Teapot_SetColor(float R, float G, float B, float A);       // Optional (last set is used). A<1.0 requires glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); and glEnable(GL_BLEND); to make transparency work
 #ifdef TEAPOT_SHADER_SPECULAR
 void Teapot_SetColorSpecular(float R, float G, float B, float SHI); // Optional (last set is used)
 #endif //TEAPOT_SHADER_SPECULAR
@@ -54,8 +63,12 @@ void Teapot_Draw(const float mMatrix[16],TeapotMeshEnum meshId);   // Hp) mMatri
 
 void Teapot_PostDraw(void); // unsets program and buffers for drawing
 
-__inline void Teapot_GetMeshCenter(TeapotMeshEnum meshId,float center[3]);
-__inline void Teapot_GetMeshHalfAabb(TeapotMeshEnum meshId,float halfAabb[3]);
+void Teapot_GetMeshAabbCenter(TeapotMeshEnum meshId,float center[3]);
+void Teapot_GetMeshAabbHalfExtents(TeapotMeshEnum meshId,float halfAabb[3]);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //TEAPOT_H_
 
@@ -63,6 +76,10 @@ __inline void Teapot_GetMeshHalfAabb(TeapotMeshEnum meshId,float halfAabb[3]);
 #ifdef TEAPOT_IMPLEMENTATION
 
 #include <math.h>   // sqrt
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 static const char* TeapotVS[] = {
     "#ifdef GL_ES\n"
@@ -117,7 +134,7 @@ static const char* TeapotFS[] = {
 
 typedef struct {
     GLuint programId;
-    GLuint vertexBuffer,normalBuffer,elementBuffer;
+    GLuint vertexBuffer,elementBuffer;
     int startInds[TEAPOT_MESH_COUNT];
     int numInds[TEAPOT_MESH_COUNT];
     float halfExtents[TEAPOT_MESH_COUNT][3];
@@ -137,7 +154,7 @@ static __inline GLuint Teapot_LoadShaderProgramFromSource(const char* vs,const c
 void Teapot_SetViewMatrixAndLightDirection(const float vMatrix[16],const float lightDirectionWorldSpace[3])   {
     // lightDirectionViewSpace = v3_norm(m4_mul_dir(vMatrix,light_direction));
     memcpy(TIS.vMatrix,vMatrix,16*sizeof(float));
-    //int i;for (i=0;i<16;i++) TIS.vMatrix[i]=vMatrix[i];
+    //int i;for (i=0;i<16;i++) TIS.vMatrix[i]=vMatrix[i];	// what's faster ?
     float lightDirectionViewSpace[3] = {
         lightDirectionWorldSpace[0]*TIS.vMatrix[0] + lightDirectionWorldSpace[1]*TIS.vMatrix[4] + lightDirectionWorldSpace[2]*TIS.vMatrix[8],
         lightDirectionWorldSpace[0]*TIS.vMatrix[1] + lightDirectionWorldSpace[1]*TIS.vMatrix[5] + lightDirectionWorldSpace[2]*TIS.vMatrix[9],
@@ -160,12 +177,10 @@ void Teapot_SetProjectionMatrix(const float pMatrix[16])    {
 void Teapot_PreDraw(void)   {
     if (TIS.programId)  {
         glEnableVertexAttribArray(TIS.aLoc_vertex);
-        glBindBuffer(GL_ARRAY_BUFFER, TIS.vertexBuffer);
-        glVertexAttribPointer(TIS.aLoc_vertex, 3, GL_FLOAT, GL_FALSE, sizeof(float)*3, 0);
-
         glEnableVertexAttribArray(TIS.aLoc_normal);
-        glBindBuffer(GL_ARRAY_BUFFER, TIS.normalBuffer);
-        glVertexAttribPointer(TIS.aLoc_normal, 3, GL_FLOAT, GL_FALSE, sizeof(float)*3, 0);
+        glBindBuffer(GL_ARRAY_BUFFER, TIS.vertexBuffer);
+        glVertexAttribPointer(TIS.aLoc_vertex, 3, GL_FLOAT, GL_FALSE, sizeof(float)*6, 0);
+        glVertexAttribPointer(TIS.aLoc_normal, 3, GL_FLOAT, GL_FALSE, sizeof(float)*6, (void*)(sizeof(float)*3));
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TIS.elementBuffer);
 
@@ -362,25 +377,23 @@ static __inline GLuint Teapot_LoadShaderProgramFromSource(const char* vs,const c
 // numVerts is the number of vertices (= number of 3 floats)
 // numInds is the number of triangle indices (= 3 * num triangles)
 // pNormsOut must be the same size as pVerts
-__inline static void CalculateVertexNormals(const float* pVerts,int numVerts,const unsigned short* pInds,int numInds,float* pNormsOut)   {
+__inline static void CalculateVertexNormals(const float* pVerts,int numVerts,int vertsStrideInNumComponents,const unsigned short* pInds,int numInds,float* pNormsOut,int normsStrideInNumComponents)   {
     if (!pVerts || !pNormsOut || !pInds || numInds<3 || numVerts<3) return;
     // Calculate vertex normals
     {
         int i,f,iSz;float v21[3],v01[3],vcr[3];float len;
-        for (i=0;i<numVerts*3;i++)	pNormsOut[i] = 0.f;
+        if (vertsStrideInNumComponents<3)  vertsStrideInNumComponents = 3;
+        if (normsStrideInNumComponents<3)  normsStrideInNumComponents = 3;
+        for (i=0,iSz=numVerts*normsStrideInNumComponents;i<iSz;i+=normsStrideInNumComponents)	{pNormsOut[i]=pNormsOut[i+1]=pNormsOut[i+2]=0.f;}
 
         for (f = 0;f < numInds;f=f+3)	{
-            const int id1 = 3*(int)pInds[f];
-            const int id2 = 3*(int)pInds[f+1];
-            const int id3 = 3*(int)pInds[f+2];
+            const float* v0 = &pVerts[vertsStrideInNumComponents*(int)pInds[f]];
+            const float* v1 = &pVerts[vertsStrideInNumComponents*(int)pInds[f+1]];
+            const float* v2 = &pVerts[vertsStrideInNumComponents*(int)pInds[f+2]];
 
-            const float* v0 = &pVerts[id1];
-            const float* v1 = &pVerts[id2];
-            const float* v2 = &pVerts[id3];
-
-            float* n0 = &pNormsOut[id1];
-            float* n1 = &pNormsOut[id2];
-            float* n2 = &pNormsOut[id3];
+            float* n0 = &pNormsOut[normsStrideInNumComponents*(int)pInds[f]];
+            float* n1 = &pNormsOut[normsStrideInNumComponents*(int)pInds[f+1]];
+            float* n2 = &pNormsOut[normsStrideInNumComponents*(int)pInds[f+2]];
 
             v21[0] = v2[0]-v1[0];   v21[1] = v2[1]-v1[1];   v21[2] = v2[2]-v1[2];
             v01[0] = v0[0]-v1[0];   v01[1] = v0[1]-v1[1];   v01[2] = v0[2]-v1[2];
@@ -394,7 +407,7 @@ __inline static void CalculateVertexNormals(const float* pVerts,int numVerts,con
             n1[0]+=vcr[0];  n1[1]+=vcr[1];  n1[2]+=vcr[2];
             n2[0]+=vcr[0];  n2[1]+=vcr[1];  n2[2]+=vcr[2];
         }
-        for (i=0,iSz=numVerts*3;i<iSz;i+=3)	{
+        for (i=0,iSz=numVerts*normsStrideInNumComponents;i<iSz;i+=normsStrideInNumComponents)	{
             float* n = &pNormsOut[i];
             len = n[0]*n[0]+n[1]*n[1]+n[2]*n[2];
             if (len>0.00001f)   {len = sqrt(len);n[0]/=len;n[1]/=len;n[2]/=len;}
@@ -404,14 +417,15 @@ __inline static void CalculateVertexNormals(const float* pVerts,int numVerts,con
 }
 
 // numVerts is the number of vertices (= number of 3 floats)
-__inline static void GetAabbHalfExtentsAndCenter(const float* pVerts,const int numVerts,float halfExtentsOut[3],float centerPointOut[3])	{
+__inline static void GetAabbHalfExtentsAndCenter(const float* pVerts,const int numVerts,int vertsStrideInNumComponents,float halfExtentsOut[3],float centerPointOut[3])	{
     float minValue[3];float maxValue[3];float tempVert[3];int i,i3;
+    if (vertsStrideInNumComponents<3) vertsStrideInNumComponents=3;
     if (pVerts && numVerts>0)	{
         minValue[0]=maxValue[0]=pVerts[0];minValue[1]=maxValue[1]=pVerts[1];minValue[2]=maxValue[2]=pVerts[2];
     }
     else minValue[0]=maxValue[0]=minValue[1]=maxValue[1]=minValue[2]=maxValue[2]=0;
     for (i=1; i<numVerts; i++)	{
-        i3 = i*3;tempVert[0]=pVerts[i3];tempVert[1]=pVerts[i3+1];tempVert[2]=pVerts[i3+2];
+        i3 = i*vertsStrideInNumComponents;tempVert[0]=pVerts[i3];tempVert[1]=pVerts[i3+1];tempVert[2]=pVerts[i3+2];
         if (minValue[0]>tempVert[0])        minValue[0]=tempVert[0];
         else if (maxValue[0]<tempVert[0])   maxValue[0]=tempVert[0];
         if (minValue[1]>tempVert[1])        minValue[1]=tempVert[1];
@@ -430,10 +444,6 @@ void Teapot_Destroy(void) {
         glDeleteBuffers(1,&TIS.vertexBuffer);
         TIS.vertexBuffer = 0;
     }
-    if (TIS.normalBuffer) {
-        glDeleteBuffers(1,&TIS.normalBuffer);
-        TIS.normalBuffer = 0;
-    }
     if (TIS.elementBuffer) {
         glDeleteBuffers(1,&TIS.elementBuffer);
         TIS.elementBuffer = 0;
@@ -443,10 +453,10 @@ void Teapot_Destroy(void) {
     }
 }
 
-static void AddMeshVertsAndInds(float* totVerts,const int MAX_TOTAL_VERTS,int* numTotVerts,unsigned short* totInds,const int MAX_TOTAL_INDS,int* numTotInds,
+static void AddMeshVertsAndInds(float* totVerts,const int MAX_TOTAL_VERTS,int* numTotVerts,int totVertsStrideInNumComponents,unsigned short* totInds,const int MAX_TOTAL_INDS,int* numTotInds,
                                 const float* verts,int numVerts,const unsigned short* inds,int numInds,TeapotMeshEnum meshId) {
     int i,i3;
-    float* pTotVerts = &totVerts[(*numTotVerts)*3];
+    float* pTotVerts = &totVerts[(*numTotVerts)*totVertsStrideInNumComponents];
     unsigned short* pTotInds = &totInds[*numTotInds];
     if (*numTotVerts+numVerts>MAX_TOTAL_VERTS) {
         fprintf(stderr,"Error: MAX_TOTAL_VERTS must be at least: %d\n",*numTotVerts+numVerts);
@@ -470,7 +480,7 @@ static void AddMeshVertsAndInds(float* totVerts,const int MAX_TOTAL_VERTS,int* n
         pTotVerts[2] = -verts[i3+2];
 #       endif //TEAPOT_INVERT_MESHES_Z_AXIS
 
-        pTotVerts+=3;
+        pTotVerts+=totVertsStrideInNumComponents;
     }
 
      for (i=0;i<numInds;i+=3) {
@@ -486,7 +496,7 @@ static void AddMeshVertsAndInds(float* totVerts,const int MAX_TOTAL_VERTS,int* n
     }
     //---------------------------------------------------------------------------
 
-    GetAabbHalfExtentsAndCenter(&totVerts[(*numTotVerts)*3],numVerts,&TIS.halfExtents[meshId][0],&TIS.centerPoint[meshId][0]);
+    GetAabbHalfExtentsAndCenter(&totVerts[(*numTotVerts)*totVertsStrideInNumComponents],numVerts,6,&TIS.halfExtents[meshId][0],&TIS.centerPoint[meshId][0]);
 
     /*fprintf(stderr,"%d) centerPoint:%1.2f,%1.2f,%1.2f   halfExtents:%1.2f,%1.2f,%1.2f\n",meshId,
             TIS.centerPoint[meshId][0],TIS.centerPoint[meshId][1],TIS.centerPoint[meshId][2],
@@ -495,8 +505,8 @@ static void AddMeshVertsAndInds(float* totVerts,const int MAX_TOTAL_VERTS,int* n
 
 #   ifdef TEAPOT_CENTER_MESHES_ON_FLOOR
     if (meshId<=TEAPOT_MESH_SPHERE2)    {
-        pTotVerts = &totVerts[(*numTotVerts)*3];
-        for (i=1;i<numVerts*3;i+=3) {
+        pTotVerts = &totVerts[(*numTotVerts)*totVertsStrideInNumComponents];
+        for (i=1;i<numVerts*totVertsStrideInNumComponents;i+=totVertsStrideInNumComponents) {
             pTotVerts[i] += TIS.halfExtents[meshId][1];
         }
     }
@@ -507,17 +517,17 @@ static void AddMeshVertsAndInds(float* totVerts,const int MAX_TOTAL_VERTS,int* n
     *numTotInds+=numInds;
 }
 
-__inline void Teapot_GetMeshCenter(TeapotMeshEnum meshId,float center[3]) {
+void Teapot_GetMeshAabbCenter(TeapotMeshEnum meshId,float center[3]) {
     center[0] = TIS.centerPoint[meshId][0];center[1] = TIS.centerPoint[meshId][1];center[2] = TIS.centerPoint[meshId][2];
 }
-__inline void Teapot_GetMeshHalfAabb(TeapotMeshEnum meshId,float halfAabb[3]) {
+void Teapot_GetMeshAabbHalfExtents(TeapotMeshEnum meshId,float halfAabb[3]) {
     halfAabb[0] = TIS.halfExtents[meshId][0];halfAabb[1] = TIS.halfExtents[meshId][1];halfAabb[2] = TIS.halfExtents[meshId][2];
 }
 
 
 void Teapot_Init(void) {
     int i,j;
-    TIS.vertexBuffer = TIS.normalBuffer = TIS.elementBuffer = 0;
+    TIS.vertexBuffer = TIS.elementBuffer = 0;
     for (i=0;i<TEAPOT_MESH_COUNT;i++) {
         TIS.startInds[i] = TIS.numInds[i] = 0;
         TIS.halfExtents[i][0]=TIS.halfExtents[i][1]=TIS.halfExtents[i][2]=0;
@@ -569,8 +579,8 @@ void Teapot_Init(void) {
         const unsigned MAX_TOTAL_VERTS = 1672;//10000;
         const unsigned MAX_TOTAL_INDS = 9300;//65535;
 
-        float totVerts[MAX_TOTAL_VERTS*3];
-        float norms[MAX_TOTAL_VERTS*3];
+	float totVerts[MAX_TOTAL_VERTS*3*2];	    // last x2 is because we use a single VBO with interleaved vertices and normals
+	float* norms=&totVerts[0]+3;		    // pointer to the 1st normal
         unsigned short totInds[MAX_TOTAL_INDS];
 
         int numTotVerts = 0;
@@ -690,7 +700,7 @@ void Teapot_Init(void) {
                         5,361,371,2,339,341,461,356,358,6,371,373,4,386,388,271,255,251,38,52,446,52,54,462,462,54,55,448,55,57,57,71,458,71,73,463,463,73,74,460,74,8,8,10,414,10,12,464,464,12,13,416,13,15,15,33,430,33,35,465,465,35,36,
                         432,36,38};
 
-                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
+                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,6,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
                 }
 #               endif
             }
@@ -804,7 +814,7 @@ void Teapot_Init(void) {
                         387,389,160,223,169,426,166,165,162,166,162,341,35,167,445,35,445,36,153,152,158,153,158,157,7,6,342,157,425,240,352,386,385,342,430,344,342,344,343,145,345,239,145,239,431,141,142,0,350,433,349,302,140,139,351,352,348,351,348,347,353,351,354,
                         357,114,380,357,380,358,295,357,382,295,382,360,122,434,123,446,393,121,446,121,363,436,364,435,436,435,440,367,381,441,379,127,359,379,359,369,439,374,373,100,368,367,100,367,101,105,373,94,105,94,93,375,97,99,378,93,96,378,96,377};
 
-                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
+                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,6,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
                 }
 #               endif
             }
@@ -885,7 +895,7 @@ void Teapot_Init(void) {
                         267,278,277,268,279,278,269,270,279,270,281,280,271,282,281,272,283,282,273,284,283,274,285,284,275,286,285,276,287,286,277,288,287,278,289,288,279,280,289,280,291,290,281,292,291,282,293,292,283,294,293,284,295,294,285,296,295,286,297,296,287,298,297,
                         288,299,298,289,290,299,290,1,0,291,2,1,292,3,2,293,4,3,294,5,4,295,6,5,296,7,6,297,8,7,298,9,8,299,0,9};
 
-                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
+                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,6,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
                 }
 #               endif
             }
@@ -901,7 +911,7 @@ void Teapot_Init(void) {
                     const unsigned short inds[] = {
                         3,0,2,5,6,4,9,10,11,13,14,12,19,16,17,23,20,22,3,1,0,5,7,6,9,8,10,13,15,14,19,18,16,23,21,20};
 
-                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
+                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,6,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
                 }
 #               endif
             }
@@ -924,7 +934,7 @@ void Teapot_Init(void) {
                         13,24,23,13,25,24,13,14,25,27,28,26,29,30,28,31,32,30,33,34,32,35,36,34,37,38,36,39,40,38,41,42,40,43,44,42,45,46,44,47,48,46,49,26,48,27,29,28,29,31,30,31,33,32,33,35,34,35,37,36,37,39,38,
                         39,41,40,41,43,42,43,45,44,45,47,46,47,49,48,49,27,26};
 
-                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
+                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,6,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
                 }
 #               endif
             }
@@ -943,7 +953,7 @@ void Teapot_Init(void) {
                         1,0,2,3,0,1,4,0,3,5,0,4,6,0,5,7,0,6,8,0,7,9,0,8,10,0,9,11,0,10,12,0,11,2,0,12,13,14,15,13,15,16,13,16,17,13,17,18,13,18,19,13,19,20,13,20,21,13,21,22,13,22,23,
                         13,23,24,13,24,25,13,25,14};
 
-                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
+                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,6,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
                 }
 #               endif
             }
@@ -959,7 +969,7 @@ void Teapot_Init(void) {
                     const unsigned short inds[] = {
                         0,1,2,3,4,5,0,6,1,7,8,9,10,11,12,13,14,15};
 
-                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
+                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,6,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
                 }
 #               endif
             }
@@ -976,7 +986,7 @@ void Teapot_Init(void) {
                     const unsigned short inds[] = {
                         0,1,2,5,6,7,10,11,12,0,13,1,3,14,4,5,15,6,8,16,9,10,17,11};
 
-                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
+                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,6,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
                 }
 #               endif
             }
@@ -999,7 +1009,7 @@ void Teapot_Init(void) {
                         29,26,34,26,7,34,27,33,7,27,24,33,24,6,33,25,32,6,25,22,32,22,10,32,30,31,9,30,21,31,21,4,31,28,29,8,28,20,29,20,3,29,26,27,7,26,18,27,18,2,27,24,25,6,24,14,25,14,1,25,22,23,10,
                         22,15,23,15,5,23,16,21,5,16,19,21,19,4,21,19,20,4,19,17,20,17,3,20,17,18,3,17,12,18,12,2,18,15,16,5,15,13,16,13,0,16,12,14,2,12,13,14,13,1,14};
 
-                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
+                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,6,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
                 }
 #               endif
             }
@@ -1049,7 +1059,7 @@ void Teapot_Init(void) {
                         156,25,26,22,157,156,157,158,156,156,158,25,158,24,25,23,17,157,17,16,157,157,16,158,16,15,158,158,15,24,15,0,24,12,20,2,13,159,12,14,160,13,12,159,20,159,19,20,13,160,159,160,161,159,159,161,19,161,18,19,14,15,160,
                         15,16,160,160,16,161,16,17,161,161,17,18,17,1,18};
 
-                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
+                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,6,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
                 }
 #               endif
             }
@@ -1088,7 +1098,7 @@ void Teapot_Init(void) {
                         10,9,13,10,14,15,14,18,19,15,19,20,13,17,18,18,22,23,19,23,24,17,21,22,24,23,27,22,21,25,22,26,27,28,27,31,25,29,30,26,30,31,31,30,34,32,31,35,30,29,33,34,38,39,36,35,39,33,37,38,39,43,44,
                         38,37,41,38,42,43,42,41,45,42,46,47,43,47,48,46,50,51,47,51,52,45,49,50,51,55,56,50,49,53,50,54,55,56,55,2,53,0,1,54,1,2};
 
-                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
+                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,6,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
                 }
 #               endif
             }
@@ -1114,7 +1124,7 @@ void Teapot_Init(void) {
                         10,9,13,10,14,15,14,18,19,15,19,20,13,17,18,18,22,23,19,23,24,17,21,22,24,23,27,22,21,25,22,26,27,28,27,31,25,29,30,26,30,31,31,30,34,32,31,35,30,29,33,34,38,39,36,35,39,33,37,38,39,43,44,
                         38,37,41,38,42,43,42,41,45,42,46,47,43,47,48,46,50,51,47,51,52,45,49,50,51,55,56,50,49,53,50,54,55,56,55,2,53,0,1,54,1,2};
 
-                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
+                    AddMeshVertsAndInds(totVerts,MAX_TOTAL_VERTS,&numTotVerts,6,totInds,MAX_TOTAL_INDS,&numTotInds,verts,sizeof(verts)/(sizeof(verts[0])*3),inds,sizeof(inds)/sizeof(inds[0]),i);
                 }
 #               endif
             }
@@ -1141,16 +1151,11 @@ void Teapot_Init(void) {
 
         //printf("Teapot_init(): numTotVerts = %d numTotInds = %d",numTotVerts,numTotInds);
 
-        CalculateVertexNormals(totVerts,numTotVerts,totInds,numTotInds,norms);
+        CalculateVertexNormals(totVerts,numTotVerts,6,totInds,numTotInds,norms,6);
 
         glGenBuffers(1, &TIS.vertexBuffer);
         glBindBuffer(GL_ARRAY_BUFFER, TIS.vertexBuffer);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(float)*3*numTotVerts, totVerts, GL_STATIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        glGenBuffers(1, &TIS.normalBuffer);
-        glBindBuffer(GL_ARRAY_BUFFER, TIS.normalBuffer);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(float)*3*numTotVerts, norms, GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(float)*6*numTotVerts, totVerts, GL_STATIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
         glGenBuffers(1, &TIS.elementBuffer);
@@ -1161,5 +1166,8 @@ void Teapot_Init(void) {
 
 }
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif //TEAPOT_IMPLEMENTATION

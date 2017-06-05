@@ -1,4 +1,10 @@
-//#version 120
+//#version 100
+//
+//
+//
+// Please leave the lines above empty and full of spaces
+
+
 // The MIT License
 // Copyright © 2013 Inigo Quilez
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -35,7 +41,6 @@ precision mediump float;
 
 #define USE_UNIFORM_CAMERA_MATRIX	// Mandatory for input camera mode		(arrows keys + pageup/pagedown)
 #define USE_UNIFORM_LIGHT_DIRECTION	// Mandatory for input light direction	(arrows keys + shift)
-//#define WRITE_DEPTH_VALUE		// Slow: This must be present in main.c too (needs USE_UNIFORM_CAMERA_MATRIX too)
 
 #define AA 1   // make this 1 is your machine is too slow
 
@@ -55,7 +60,6 @@ precision mediump float;
 
 //#define USE_UNIFORM_CAMERA_MATRIX	// Mandatory for input camera mode		(arrows keys + pageup/pagedown)
 //#define USE_UNIFORM_LIGHT_DIRECTION	// Mandatory for input light direction	(arrows keys + shift)
-//#define WRITE_DEPTH_VALUE		// Slow: This must be present in main.c too (needs USE_UNIFORM_CAMERA_MATRIX too)
 
 #define AA 1   // make this 1 is your machine is too slow
 #endif //USE_CUSTOM_SETTINGS
@@ -65,11 +69,13 @@ precision mediump float;
 #undef WRITE_DEPTH_VALUE
 #endif //USE_UNIFORM_CAMERA_MATRIX
 
+
 uniform vec2      iResolution;           // viewport resolution (in pixels)
 uniform float     iGlobalTime;           // shader playback time (in seconds)
 #ifdef USE_UNIFORM_CAMERA_MATRIX
 uniform mat4	  iCameraMatrix;
 uniform vec4      iProjectionData;	 // .x = near plane .y = far plane .z = tan(fov*0.5) w = aspect ratio = iResolution.x/iResolution.y
+uniform vec4	  iProjectionData2;	 // (just for speedup): .x=-np*tan(fov*0.5)*ar; .y=np*tan(fov*0.5); .z=1.0/np; .w=1.0/fp-1.0/np;    // Basically it can be set from iProjectionData only (it's redundant)
 #endif
 #ifdef USE_UNIFORM_LIGHT_DIRECTION
 uniform vec3	  iLightDirection;
@@ -254,12 +260,28 @@ vec3 opTwist( vec3 p )
 }
 
 
+ 	
+// polynomial smooth min (k = 0.1); k that controls the radious/distance of the smoothness. 
+float smin( float a, float b, float k )
+{
+	// @Flix From: http://www.iquilezles.org/www/articles/smin/smin.htm
+    float h = clamp( 0.5+0.5*(b-a)/k, 0.0, 1.0 );
+    return mix( b, a, h ) - k*h*(1.0-h);
+}
+
+
 float opMix(vec3 p, float d1, float d2) {
     // @Flix From: "Rendering Worlds with Two Triangles with raytracing on the GPU" by Iñigo Quilez
     float bfact = smoothstep( length(p), 0.0, 1.0 );
     return mix( d1, d2, bfact );
 }
 
+
+/*float opUMix(vec3 p, float d1, float d2)	{
+	// @Flix: Not sure what's this... just playing around...
+    float bfact = smoothstep( length(p), 0.0, 1.0 );
+    return smin( d1, d2, bfact );	
+}*/
 
 //------------------------------------------------------------------
 
@@ -289,13 +311,18 @@ vec2 map( in vec3 pos )
 	                           sdCylinder(  opRep( vec3(atan(pos.x+2.0,pos.z)/6.2831, pos.y, 0.02+0.5*length(pos-vec3(-2.0,0.2, 0.0))), vec3(0.05,1.0,0.05)), vec2(0.02,0.6))), 51.0 ) );
 	res = opU( res, vec2( 0.5*sdSphere(    pos-vec3(-2.0,0.25,-1.0), 0.2 ) + 0.03*sin(50.0*pos.x)*sin(50.0*pos.y)*sin(50.0*pos.z), 65.0 ) );
 	res = opU( res, vec2( 0.5*sdTorus( opTwist(pos-vec3(-2.0,0.25, 2.0)),vec2(0.20,0.05)), 46.7 ) );
+
+	// smooth union example (third arg of smin(...) is the amount of blending) [added by @Flix]
+    res = opU( res, vec2(smin(sdSphere(pos-vec3(0.0,0.35,3.0),0.1),sdBox(pos-vec3( 0.0,0.15, 3.0), vec3(0.1)), 0.1), 43.17 ) );
 #	endif	
     res = opU( res, vec2( sdConeSection( pos-vec3( 0.0,0.35,-2.0), 0.15, 0.2, 0.1 ), 13.67 ) );
     res = opU( res, vec2( sdEllipsoid( pos-vec3( 1.0,0.35,-2.0), vec3(0.15, 0.2, 0.05) ), 43.17 ) );
 
     //res = opU( res, vec2(opMix(pos,sdSphere(pos-vec3(0.0,0.25,3.0),0.25+(0.25*sinValue)), sdBox(  pos-vec3( 0.0,0.25, 3.0), vec3(0.125-(0.125*sinValue)))), 43.17 ) );
-        
-    return res;
+ 
+
+       
+    return res;	// res.y just controls the rendering material
 }
 
 vec2 castRay( in vec3 ro, in vec3 rd )
@@ -541,9 +568,14 @@ vec3 render( in vec3 ro, in vec3 rd )
 
     	col = mix( col, vec3(0.8,0.9,1.0), 1.0-exp( -0.0002*t*t*t ) );
     }
-#   ifdef WRITE_DEPTH_VALUE
-    float zDot = dot(vec3(iCameraMatrix[2][0],iCameraMatrix[2][1],iCameraMatrix[2][2]),rd);
-    gl_FragDepth = (1.0/(t*zDot) - 1.0/iProjectionData.x)/(1.0/iProjectionData.y - 1.0/iProjectionData.x);
+#   ifdef WRITE_DEPTH_VALUE		// This gets automatically defined through main.c when necessary
+#	ifdef USE_UNIFORM_CAMERA_MATRIX	// But this is necessary as well
+	float zDot = dot(vec3(iCameraMatrix[2][0],iCameraMatrix[2][1],iCameraMatrix[2][2]),rd);
+	// Slow:
+	//gl_FragDepth = (1.0/(t*zDot) - 1.0/iProjectionData.x)/(1.0/iProjectionData.y - 1.0/iProjectionData.x);
+	// Faster:
+	gl_FragDepth = (1.0/(t*zDot) - iProjectionData2.z)/iProjectionData2.w;
+#	endif //USE_UNIFORM_CAMERA_MATRIX
 #   endif //WRITE_DEPTH_VALUE
 	return vec3( clamp(col,0.0,1.0) );
 }
@@ -585,19 +617,27 @@ void main()
 #	ifndef USE_UNIFORM_CAMERA_MATRIX
         vec2 p = (-iResolution.xy + 2.0*(fragCoord+o))/iResolution.y;
 #	else
+	/* // Correct but slow:
 	vec2 p;	// Please see picture below to understand this
 	p.y = (iProjectionData.x * iProjectionData.z);
 	p.x = -p.y * iProjectionData.w;  // @Flix: we use this convention for all objects (camera included): +X = left, +Y = up, +Z = forward: thus X must go left
 	p.xy *= (2.0 * (fragCoord+o) / iResolution.xy - 1.0);	// we multiply per interval [-1,1]
+	*/
+	// Faster
+	vec2 p = iProjectionData2.xy * (2.0 * (fragCoord+o) / iResolution.xy - 1.0);
 #	endif
 #else    	
 #	ifndef USE_UNIFORM_CAMERA_MATRIX
 	vec2 p = (-iResolution.xy + 2.0*fragCoord)/iResolution.y;
 #	else
+	/* // Correct but slow:
 	vec2 p;	// Please see picture below to understand this
 	p.y = (iProjectionData.x * iProjectionData.z);
 	p.x = -p.y * iProjectionData.w;  // @Flix: we use this convention for all objects (camera included): +X = left, +Y = up, +Z = forward: thus X must go left
 	p.xy *= (2.0 * fragCoord.xy / iResolution.xy - 1.0);	// we multiply per interval [-1,1]
+	*/
+	// Faster
+	vec2 p = iProjectionData2.xy * (2.0 * fragCoord.xy / iResolution.xy - 1.0);
 #	endif
 #endif
 
@@ -608,7 +648,7 @@ void main()
         vec3 ro = vec3( -0.5+3.5*cos(0.1*time + 6.0*mo.x), 1.0 + 2.0*mo.y, 0.5 + 4.0*sin(0.1*time + 6.0*mo.x) ); // origin
         vec3 ta = vec3( -0.5, -0.4, 0.5 );	// target
         // camera-to-world transformation
-	mat3 ca = setCamera( ro, ta, 0.0 );
+		mat3 ca = setCamera( ro, ta, 0.0 );
         // ray direction
         vec3 rd = ca * normalize( vec3(p.xy,2.0) );
  		// render	
@@ -633,18 +673,24 @@ void main()
 	   iProjectionData.z = tan(fov*0.5);
 	   iProjectionData.w = aspectRatio;
 
-	   ALL THE STUFF HERE IS IN OPENGL COORDS. BUT FROM ABOVE:
-	   vec2 p = (-iResolution.xy + 2.0*fragCoord)/iResolution.y;   // what's this ???
-	   WE'D LIKE IT TO BE IN (-1,1)
+	   ALL THE STUFF HERE IS IN OPENGL COORDS.
 	*/
 
 	// ray direction
-	mat3 ca = mat3_cast(iCameraMatrix);
-	vec3 rd = ca * normalize( vec3(p.xy,iProjectionData.x));
+	// slow:
+	//mat3 ca = mat3_cast(iCameraMatrix);
+	//vec3 rd = ca * normalize( vec3(p.xy,iProjectionData.x));
+	// faster?
+	vec3 rdu = normalize( vec3(p.xy,iProjectionData.x));
+	vec3 rd = vec3(
+		iCameraMatrix[0][0]*rdu.x + iCameraMatrix[1][0]*rdu.y + iCameraMatrix[2][0]*rdu.z,
+		iCameraMatrix[0][1]*rdu.x + iCameraMatrix[1][1]*rdu.y + iCameraMatrix[2][1]*rdu.z,
+		iCameraMatrix[0][2]*rdu.x + iCameraMatrix[1][2]*rdu.y + iCameraMatrix[2][2]*rdu.z
+		);
 
 
 	// render
-        vec3 col = render( ro, rd );
+    vec3 col = render( ro, rd );
 #endif
 
        
