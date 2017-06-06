@@ -12,7 +12,7 @@ A ShaderToy's Demo by Inigo Quilez in a single main.c file
 * **Emscripten**: emcc -O2 -fno-rtti -fno-exceptions -o 3D_Signed_Distance_Shapes_Demo.html main.c --preload-file signed_distance_shapes.glsl -I"./" -s LEGACY_GL_EMULATION=0 --closure 1
 * **Mac**: ???
 
-*Optionally* -D"WRITE_DEPTH_VALUE" (or /D"WRITE_DEPTH_VALUE") can be added to the command lines above, to mix sphere-cast rendering and normal polygon rendering (but it does not work in Emscripten, due to WebGL limitations).
+*Optionally* -D"WRITE_DEPTH_VALUE" (or /D"WRITE_DEPTH_VALUE") can be added to the command lines above, to mix sphere-cast rendering and normal polygon rendering (in Emscripten it uses the GL_EXT_frag_depth extension).
 
 ### Useful links
 [Inigo Quilez related page with this demo at the bottom](http://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm)

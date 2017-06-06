@@ -1,4 +1,4 @@
-//#version 100
+//#version 100	#version 300 es
 //
 //
 //
@@ -16,6 +16,7 @@
 // More info here: http://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
 
 #ifdef GL_ES
+#extension GL_EXT_frag_depth : enable	// require  // NOTE: From WebGL2 this extension is always missing, but gl_FragDepth is present in shaders with  #version 300 es
 precision mediump float;
 #endif
 
@@ -65,9 +66,14 @@ precision mediump float;
 #endif //USE_CUSTOM_SETTINGS
 
 
+
+
 #ifndef USE_UNIFORM_CAMERA_MATRIX
 #undef WRITE_DEPTH_VALUE
 #endif //USE_UNIFORM_CAMERA_MATRIX
+#ifndef GL_EXT_frag_depth
+#undef WRITE_DEPTH_VALUE
+#endif
 
 
 uniform vec2      iResolution;           // viewport resolution (in pixels)
@@ -574,7 +580,11 @@ vec3 render( in vec3 ro, in vec3 rd )
 	// Slow:
 	//gl_FragDepth = (1.0/(t*zDot) - 1.0/iProjectionData.x)/(1.0/iProjectionData.y - 1.0/iProjectionData.x);
 	// Faster:
+#	ifndef GL_ES
 	gl_FragDepth = (1.0/(t*zDot) - iProjectionData2.z)/iProjectionData2.w;
+#	else //GL_ES
+	gl_FragDepthEXT = (1.0/(t*zDot) - iProjectionData2.z)/iProjectionData2.w;
+#	endif //GL_ES
 #	endif //USE_UNIFORM_CAMERA_MATRIX
 #   endif //WRITE_DEPTH_VALUE
 	return vec3( clamp(col,0.0,1.0) );

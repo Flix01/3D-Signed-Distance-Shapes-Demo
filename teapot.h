@@ -105,7 +105,7 @@ static const char* TeapotVS[] = {
 #   ifndef TEAPOT_SHADER_SPECULAR
     "   v_color = vec4(u_color.rgb * fDot,u_color.a);\n"
 #   else  // TEAPOT_SHADER_SPECULAR
-    "   vec3 E = normalize(-vertexScaledEyeSpace);\n"
+    "   vec3 E = normalize(-vertexScaledEyeSpace.xyz);\n"
     "   vec3 halfVector = normalize(u_lightVector + E);\n"
     "   float nxHalf = max(0.0,dot(normalEyeSpace, halfVector));\n"
     "   vec3 specularColor = u_colorSpecular.rgb * pow(nxHalf,u_colorSpecular.a);\n"

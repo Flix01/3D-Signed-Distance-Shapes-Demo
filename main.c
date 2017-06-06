@@ -11,7 +11,7 @@
 #	undef NO_FIXED_FUNCTION_PIPELINE
 #	define NO_FIXED_FUNCTION_PIPELINE
 #   ifdef WRITE_DEPTH_VALUE
-#   error WRITE_DEPTH_VALUE is not supported in WebGL (no depth render buffer support in FBO and no gl_FragDepth in fragment shader)
+//#   warning WRITE_DEPTH_VALUE might not work in emscripten
 #   endif //WRITE_DEPTH_VALUE
 #endif //__EMSCRIPTEN__
 
@@ -259,7 +259,11 @@ void RenderTarget_Init(RenderTarget* rt,int width, int height) {
 
 #   ifdef WRITE_DEPTH_VALUE
         glBindRenderbuffer(GL_RENDERBUFFER, rt->depth_buffer[i]);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, rt->width, rt->height);	// GL_DEPTH_COMPONENT or GL_DEPTH_COMPONENT16
+#       ifdef __EMSCRIPTEN__	// WebGL 1.0 (in Firefox) seems to accept only this setting (we could use it for non-emscripten builds too)
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, rt->width, rt->height);	// GL_DEPTH_COMPONENT16 work
+#       else //__EMSCRIPTEN__
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, rt->width, rt->height);
+#       endif //__EMSCRIPTEN__
 #   endif //WRITE_DEPTH_VALUE
 
         glBindFramebuffer(GL_FRAMEBUFFER, rt->frame_buffer[i]);
